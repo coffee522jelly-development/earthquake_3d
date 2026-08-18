@@ -322,11 +322,24 @@ function setView(view){
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
 
 async function loadHistory(){
-  const url='https://api.p2pquake.net/v2/history?codes=551&limit=100';
-  const r=await fetch(url);
-  if(!r.ok) throw new Error(`API HTTP ${r.status}`);
-  const data=await r.json();
-  earthquakes=data.filter(validEarthquake).sort((a,b)=>quakeDate(b)-quakeDate(a));
+  let allData = [];
+  const limit = 100;
+  const maxPages = 10;
+  for (let page = 0; page < maxPages; page++) {
+    const offset = page * limit;
+    const url = `https://api.p2pquake.net/v2/history?codes=551&limit=${limit}&offset=${offset}`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) break;
+      const data = await r.json();
+      if (!Array.isArray(data) || data.length === 0) break;
+      allData.push(...data);
+      if (data.length < limit) break;
+    } catch (e) {
+      break;
+    }
+  }
+  earthquakes = allData.filter(validEarthquake).sort((a,b)=>quakeDate(b)-quakeDate(a));
   earthquakes.forEach(addQuake);
   renderDashboard();
   document.querySelector('#status').textContent=`過去${earthquakes.length}件を取得 / WebSocket待機中`;
