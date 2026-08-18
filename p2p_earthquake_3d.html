@@ -112,7 +112,10 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0,0,0);
 
-scene.add(new THREE.AmbientLight(0xffffff, 1.8));
+scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(200, 400, 300);
+scene.add(dirLight);
 
 const worldGroup = new THREE.Group();
 scene.add(worldGroup);
@@ -129,10 +132,47 @@ const SX = 28;
 const SZ = 32;
 const DEPTH_SCALE = 3.0;
 
+// 山の標高データ近似関数 (日本列島の主要山脈・山地)
+function getElevation(lon, lat) {
+  let h = 0;
+  function peak(cx, cy, radius, height) {
+    const dx = lon - cx;
+    const dy = lat - cy;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < radius * radius) {
+      h += height * Math.exp(-distSq / (radius * radius * 0.4));
+    }
+  }
+  // 日本アルプス（飛騨・木曽・赤石山脈）および 富士山
+  peak(137.8, 36.1, 1.2, 16.0);
+  peak(138.2, 35.8, 1.0, 14.0);
+  peak(138.73, 35.36, 0.45, 22.0); // 富士山
+  peak(138.8, 36.0, 0.8, 10.0);
+  // 奥羽山脈・東北脊梁
+  for (let latI = 37.0; latI <= 40.8; latI += 0.4) {
+    peak(140.5, latI, 0.7, 9.0);
+  }
+  // 北海道（大雪山系・日高山脈）
+  peak(142.8, 43.6, 1.2, 12.0);
+  peak(142.6, 42.5, 0.9, 10.0);
+  // 紀伊山地
+  peak(135.9, 34.2, 0.9, 10.0);
+  // 四国山地
+  peak(133.2, 33.7, 0.9, 11.0);
+  // 中国山地
+  peak(133.5, 35.3, 0.8, 8.0);
+  // 九州山地（阿蘇・九重・霧島）
+  peak(131.1, 32.8, 0.9, 10.0);
+  peak(130.8, 31.9, 0.8, 8.0);
+
+  return h;
+}
+
 function geoTo3D(lon, lat, depth=0) {
+  const elev = (depth === 0) ? getElevation(lon, lat) : 0;
   return new THREE.Vector3(
     (lon - LON0) * SX,
-    -depth * DEPTH_SCALE,
+    elev - depth * DEPTH_SCALE,
     -(lat - LAT0) * SZ
   );
 }
@@ -148,27 +188,41 @@ let mapLineMat, mapFillMat, faultLineMat;
 // GeoJSONをThree.jsの線として描画
 function addGeoJSON(obj) {
   mapLineMat = new THREE.LineBasicMaterial({color:0x8fa9b8});
-  mapFillMat = new THREE.MeshBasicMaterial({
-    color:0x10232c, transparent:true, opacity:.55,
+  mapFillMat = new THREE.MeshStandardMaterial({
+    color:0x152c38,
+    roughness: 0.8,
+    metalness: 0.1,
+    transparent:true,
+    opacity:.85,
     side:THREE.DoubleSide
   });
 
   function polygon(coords) {
     const shape = new THREE.Shape();
-    const pts = [];
     coords.forEach((p,i)=>{
       const v=geoTo3D(p[0],p[1],0);
-      pts.push(new THREE.Vector2(v.x,-v.z));
       if(i===0) shape.moveTo(v.x,-v.z); else shape.lineTo(v.x,-v.z);
     });
     shape.closePath();
 
     const geo = new THREE.ShapeGeometry(shape);
+    // 2D ShapeGeometryの各頂点(x, y, 0)に対して、元の(lon, lat)から標高Yを設定
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const vx = pos.getX(i);
+      const vz = -pos.getY(i); // rotation.x = -Math.PI/2 を考慮
+      const lon = LON0 + vx / SX;
+      const lat = LAT0 - vz / SZ;
+      const elev = getElevation(lon, lat);
+      pos.setZ(i, elev); // ShapeGeometryはZ=0平面なのでZをY標高（回転後Y軸方向）に設定
+    }
+    geo.computeVertexNormals();
+
     const mesh = new THREE.Mesh(geo,mapFillMat);
     mesh.rotation.x=-Math.PI/2;
     mapGroup.add(mesh);
 
-    const linePts = coords.map(p=>geoTo3D(p[0],p[1],0.2));
+    const linePts = coords.map(p=>geoTo3D(p[0],p[1],0));
     const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
     mapGroup.add(new THREE.Line(lineGeo,mapLineMat));
   }
@@ -463,19 +517,18 @@ function toggleTheme(){
 
   if(isLightMode){
     scene.background.set(0xf1f5f9);
-    grid.material.color.set(0xcbd5e1);
-    grid.material.transparent = true;
-    grid.material.opacity = 0.35;
+    grid.visible = false;
     if(mapLineMat) mapLineMat.color.set(0x64748b);
-    if(mapFillMat) mapFillMat.color.set(0xe2e8f0);
+    if(mapFillMat) mapFillMat.color.set(0xdbeade);
     if(faultLineMat) faultLineMat.color.set(0xd97706);
   } else {
     scene.background.set(0x071018);
+    grid.visible = true;
     grid.material.color.set(0xffffff);
     grid.material.transparent = false;
     grid.material.opacity = 1.0;
     if(mapLineMat) mapLineMat.color.set(0x8fa9b8);
-    if(mapFillMat) mapFillMat.color.set(0x10232c);
+    if(mapFillMat) mapFillMat.color.set(0x152c38);
     if(faultLineMat) faultLineMat.color.set(0xef4444);
   }
 }
