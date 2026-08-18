@@ -105,9 +105,12 @@ controls.target.set(0,0,0);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1.8));
 
+const worldGroup = new THREE.Group();
+scene.add(worldGroup);
+
 const grid = new THREE.GridHelper(900, 30, 0x30414c, 0x17242d);
 grid.rotation.x = 0;
-scene.add(grid);
+worldGroup.add(grid);
 
 // 日本の緯度経度をThree.jsのローカル座標へ。
 // 地図はおおよそ日本全体が画面に入るスケール。
@@ -126,7 +129,7 @@ function geoTo3D(lon, lat, depth=0) {
 }
 
 const mapGroup = new THREE.Group();
-scene.add(mapGroup);
+worldGroup.add(mapGroup);
 
 let mapLineMat, mapFillMat;
 
@@ -176,7 +179,7 @@ async function loadMap(){
 
 // 地震
 const quakeGroup = new THREE.Group();
-scene.add(quakeGroup);
+worldGroup.add(quakeGroup);
 
 const quakeMeshes = new Map();
 
@@ -409,8 +412,32 @@ window.addEventListener('resize',()=>{
   }
 })();
 
+function handleXRControllerScale(){
+  const session = renderer.xr.getSession();
+  if (!session || !session.inputSources) return;
+
+  for (const source of session.inputSources) {
+    if (source && source.gamepad) {
+      const axes = source.gamepad.axes;
+      if (!axes || axes.length === 0) continue;
+
+      // WebXR standard gamepad: axes[3] or axes[1] for thumbstick Y-axis
+      const thumbY = axes.length >= 4 ? axes[3] : (axes.length >= 2 ? axes[1] : 0);
+
+      if (Math.abs(thumbY) > 0.15) {
+        // Push thumbstick up (thumbY < 0) to scale up / zoom in; down (thumbY > 0) to scale down / zoom out
+        const scaleFactor = 1.0 - thumbY * 0.025;
+        const currentScale = worldGroup.scale.x;
+        const newScale = Math.max(0.1, Math.min(15.0, currentScale * scaleFactor));
+        worldGroup.scale.setScalar(newScale);
+      }
+    }
+  }
+}
+
 function animate(){
   controls.update();
+  handleXRControllerScale();
   renderer.render(scene,camera);
 }
 renderer.setAnimationLoop(animate);
