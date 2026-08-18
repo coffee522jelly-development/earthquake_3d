@@ -8,7 +8,7 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;color:#e8f0f5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 #app{width:100%;height:100%;position:relative}
 canvas{display:block}
-#hud{position:absolute;left:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);min-width:260px}
+#hud{position:absolute;left:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);min-width:340px;max-width:calc(100vw - 32px)}
 h1{font-size:16px;margin:0 0 8px}
 #status{font-size:12px;color:#9fb2be;margin-bottom:8px}
 #latest{font-size:13px;line-height:1.55}
@@ -42,7 +42,7 @@ h1{font-size:16px;margin:0 0 8px}
     <div id="latest">---</div>
     <div id="list"></div>
   </div>
-  <div id="legend">● 震源　高さ = 深さ　大きさ = M</div>
+  <div id="legend">● 震源 (赤: 浅 ～ 青: 深 / 半透明)　高さ = 深さ　大きさ = M</div>
   <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
 </div>
 
@@ -57,6 +57,7 @@ h1{font-size:16px;margin:0 0 8px}
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
+import {VRButton} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/webxr/VRButton.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x071018);
@@ -67,7 +68,9 @@ camera.position.set(0, 420, 520);
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
+renderer.xr.enabled = true;
 document.querySelector('#app').appendChild(renderer.domElement);
+document.body.appendChild(VRButton.createButton(renderer));
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -148,6 +151,14 @@ scene.add(quakeGroup);
 
 const quakeMeshes = new Map();
 
+function getDepthColor(depth){
+  const maxDepth = 300;
+  const clamped = Math.max(0, Math.min(depth, maxDepth));
+  const t = clamped / maxDepth;
+  const hue = t * 0.666; // 0: 赤 (地表付近) ~ 0.666: 青 (深部)
+  return new THREE.Color().setHSL(hue, 1.0, 0.5);
+}
+
 function scaleForMagnitude(m){
   if(!Number.isFinite(m) || m < 0) return 1.5;
   return Math.max(1.5, Math.pow(1.7, m-2.5));
@@ -161,20 +172,28 @@ function addQuake(q){
 
   const p=geoTo3D(h.longitude,h.latitude,h.depth);
   const radius=Math.min(scaleForMagnitude(h.magnitude),18);
+  const color=getDepthColor(h.depth);
 
   const geo=new THREE.SphereGeometry(radius,20,14);
-  const mat=new THREE.MeshBasicMaterial({color:0xff7043});
+  const mat=new THREE.MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: 0.6,
+    depthWrite: false
+  });
   const mesh=new THREE.Mesh(geo,mat);
   mesh.position.copy(p);
   mesh.userData={q};
   quakeGroup.add(mesh);
-  quakeMeshes.set(q.id,mesh);
 
   // 地表位置から震源までの線
   const surface=geoTo3D(h.longitude,h.latitude,0);
   const lineGeo=new THREE.BufferGeometry().setFromPoints([surface,p]);
-  const lineMat=new THREE.LineBasicMaterial({color:0xff7043,transparent:true,opacity:.28});
-  quakeGroup.add(new THREE.Line(lineGeo,lineMat));
+  const lineMat=new THREE.LineBasicMaterial({color: color, transparent:true, opacity:.35});
+  const line=new THREE.Line(lineGeo,lineMat);
+  quakeGroup.add(line);
+
+  quakeMeshes.set(q.id, {mesh, line});
 }
 
 let earthquakes = [];
@@ -216,6 +235,13 @@ function viewItems(){
 
 function renderDashboard(){
   const items=viewItems();
+  const visibleIds=new Set(items.map(q=>q.id));
+  quakeMeshes.forEach(({mesh, line}, id)=>{
+    const isVisible=visibleIds.has(id);
+    mesh.visible=isVisible;
+    line.visible=isVisible;
+  });
+
   const labels={today:'今日',month:'今月',year:'今年',recent:'直近20件'};
   document.querySelector('#summary').textContent=`${labels[currentView]}：${items.length}件`;
 
@@ -239,10 +265,10 @@ function renderDashboard(){
       `<div class="quake-title"><span class="badge">${magnitude(q)}</span>${h.name||'震源不明'}</div>`+
       `<div class="quake-meta">${formatTime(q)}　深さ ${h.depth} km　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
     row.onclick=()=>{
-      const mesh=quakeMeshes.get(q.id);
-      if(mesh){
-        controls.target.copy(mesh.position);
-        camera.position.copy(mesh.position).add(new THREE.Vector3(70,70,70));
+      const entry=quakeMeshes.get(q.id);
+      if(entry && entry.mesh){
+        controls.target.copy(entry.mesh.position);
+        camera.position.copy(entry.mesh.position).add(new THREE.Vector3(70,70,70));
       }
     };
     list.appendChild(row);
@@ -306,11 +332,10 @@ window.addEventListener('resize',()=>{
 })();
 
 function animate(){
-  requestAnimationFrame(animate);
   controls.update();
   renderer.render(scene,camera);
 }
-animate();
+renderer.setAnimationLoop(animate);
 </script>
 </body>
 </html>
