@@ -23,8 +23,32 @@ h1{font-size:16px;margin:0 0 8px}
 .quake-title{font-weight:600;font-size:12px}
 .quake-meta{font-size:11px;color:#91a6b2;margin-top:2px}
 .badge{display:inline-block;border:1px solid #4c626f;border-radius:4px;padding:1px 4px;margin-right:5px;color:#ffd1bf}
-#legend{position:absolute;right:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px}
+.badge-blue{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,0.12)}
+.badge-yellow{border-color:#facc15;color:#facc15;background:rgba(250,204,21,0.12)}
+.badge-red{border-color:#f87171;color:#f87171;background:rgba(248,113,113,0.12)}
+#top-right{position:absolute;right:16px;top:16px;z-index:5;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.theme-btn{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;color:#e8f0f5;padding:8px 12px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s ease}
+.theme-btn:hover{background:#12202a}
+#legend{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px;backdrop-filter:blur(8px)}
 #help{position:absolute;left:16px;bottom:16px;z-index:5;color:#91a4b0;font-size:12px}
+
+/* Light mode styles */
+body.light-mode{background:#f0f4f8;color:#1c2833}
+body.light-mode #hud{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+body.light-mode #status{color:#546e7a}
+body.light-mode #summary{color:#37474f}
+body.light-mode .tab{background:#e2e8f0;border-color:#cbd5e1;color:#334155}
+body.light-mode .tab:hover{background:#cbd5e1}
+body.light-mode .tab.active{background:#0284c7;color:#fff;border-color:#0284c7}
+body.light-mode #list{border-top-color:#cbd5e1}
+body.light-mode .quake-row{border-bottom-color:#e2e8f0}
+body.light-mode .quake-row:hover{background:rgba(0,0,0,.04)}
+body.light-mode .quake-meta{color:#64748b}
+body.light-mode .badge{border-color:#94a3b8;color:#0369a1}
+body.light-mode .theme-btn{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833}
+body.light-mode .theme-btn:hover{background:#e2e8f0}
+body.light-mode #legend{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+body.light-mode #help{color:#64748b}
 </style>
 </head>
 <body>
@@ -42,7 +66,10 @@ h1{font-size:16px;margin:0 0 8px}
     <div id="latest">---</div>
     <div id="list"></div>
   </div>
-  <div id="legend">● 震源 (赤: 浅 ～ 青: 深 / 半透明)　高さ = 深さ　大きさ = M</div>
+  <div id="top-right">
+    <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
+    <div id="legend">● 震源 (赤: 浅 ～ 青: 深 / 半透明)　高さ = 深さ　大きさ = M</div>
+  </div>
   <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
 </div>
 
@@ -101,10 +128,12 @@ function geoTo3D(lon, lat, depth=0) {
 const mapGroup = new THREE.Group();
 scene.add(mapGroup);
 
+let mapLineMat, mapFillMat;
+
 // GeoJSONをThree.jsの線として描画
 function addGeoJSON(obj) {
-  const lineMat = new THREE.LineBasicMaterial({color:0x8fa9b8});
-  const fillMat = new THREE.MeshBasicMaterial({
+  mapLineMat = new THREE.LineBasicMaterial({color:0x8fa9b8});
+  mapFillMat = new THREE.MeshBasicMaterial({
     color:0x10232c, transparent:true, opacity:.55,
     side:THREE.DoubleSide
   });
@@ -120,13 +149,13 @@ function addGeoJSON(obj) {
     shape.closePath();
 
     const geo = new THREE.ShapeGeometry(shape);
-    const mesh = new THREE.Mesh(geo,fillMat);
+    const mesh = new THREE.Mesh(geo,mapFillMat);
     mesh.rotation.x=-Math.PI/2;
     mapGroup.add(mesh);
 
     const linePts = coords.map(p=>geoTo3D(p[0],p[1],0.2));
     const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
-    mapGroup.add(new THREE.Line(lineGeo,lineMat));
+    mapGroup.add(new THREE.Line(lineGeo,mapLineMat));
   }
 
   function geometry(g) {
@@ -233,6 +262,14 @@ function viewItems(){
   return earthquakes.filter(q=>quakeDate(q)>=start);
 }
 
+function getMagnitudeBadgeClass(q){
+  const m=q?.earthquake?.hypocenter?.magnitude;
+  if(!Number.isFinite(m) || m < 0) return 'badge-blue';
+  if(m < 3.0) return 'badge-blue';
+  if(m < 5.0) return 'badge-yellow';
+  return 'badge-red';
+}
+
 function renderDashboard(){
   const items=viewItems();
   const visibleIds=new Set(items.map(q=>q.id));
@@ -261,8 +298,9 @@ function renderDashboard(){
     const h=q.earthquake.hypocenter;
     const row=document.createElement('div');
     row.className='quake-row';
+    const badgeClass=getMagnitudeBadgeClass(q);
     row.innerHTML=
-      `<div class="quake-title"><span class="badge">${magnitude(q)}</span>${h.name||'震源不明'}</div>`+
+      `<div class="quake-title"><span class="badge ${badgeClass}">${magnitude(q)}</span>${h.name||'震源不明'}</div>`+
       `<div class="quake-meta">${formatTime(q)}　深さ ${h.depth} km　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
     row.onclick=()=>{
       const entry=quakeMeshes.get(q.id);
@@ -313,6 +351,33 @@ function connectWS(){
   ws.onerror=()=>document.querySelector('#status').textContent='WebSocket接続エラー（履歴表示は継続）';
   ws.onclose=()=>setTimeout(connectWS,5000);
 }
+
+let isLightMode = false;
+
+function toggleTheme(){
+  isLightMode = !isLightMode;
+  document.body.classList.toggle('light-mode', isLightMode);
+  const themeBtn = document.querySelector('#theme-toggle');
+  themeBtn.textContent = isLightMode ? '🌙 ダークモード' : '☀️ ライトモード';
+
+  if(isLightMode){
+    scene.background.set(0xf1f5f9);
+    grid.material.color.set(0xcbd5e1);
+    grid.material.transparent = true;
+    grid.material.opacity = 0.35;
+    if(mapLineMat) mapLineMat.color.set(0x64748b);
+    if(mapFillMat) mapFillMat.color.set(0xe2e8f0);
+  } else {
+    scene.background.set(0x071018);
+    grid.material.color.set(0xffffff);
+    grid.material.transparent = false;
+    grid.material.opacity = 1.0;
+    if(mapLineMat) mapLineMat.color.set(0x8fa9b8);
+    if(mapFillMat) mapFillMat.color.set(0x10232c);
+  }
+}
+
+document.querySelector('#theme-toggle').addEventListener('click', toggleTheme);
 
 window.addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
