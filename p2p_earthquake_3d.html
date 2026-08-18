@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P2P地震情報 3D Earthquake Viewer</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;color:#e8f0f5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{width:100%;height:100%;position:relative}
+canvas{display:block}
+#hud{position:absolute;left:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);min-width:260px}
+h1{font-size:16px;margin:0 0 8px}
+#status{font-size:12px;color:#9fb2be;margin-bottom:8px}
+#latest{font-size:13px;line-height:1.55}
+#summary{font-size:12px;color:#b9cbd4;margin:8px 0}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px 0}
+.tab{border:1px solid #3a4d59;background:#12202a;color:#b8c8d1;border-radius:6px;padding:6px 5px;cursor:pointer;font-size:12px}
+.tab:hover{background:#1a2d38}
+.tab.active{background:#29404d;color:#fff;border-color:#617987}
+#list{margin-top:10px;max-height:290px;overflow:auto;border-top:1px solid #263842}
+.quake-row{padding:8px 3px;border-bottom:1px solid #263842;cursor:pointer}
+.quake-row:hover{background:rgba(255,255,255,.04)}
+.quake-title{font-weight:600;font-size:12px}
+.quake-meta{font-size:11px;color:#91a6b2;margin-top:2px}
+.badge{display:inline-block;border:1px solid #4c626f;border-radius:4px;padding:1px 4px;margin-right:5px;color:#ffd1bf}
+#legend{position:absolute;right:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px}
+#help{position:absolute;left:16px;bottom:16px;z-index:5;color:#91a4b0;font-size:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <h1>日本の地震 — 3D Viewer</h1>
+    <div id="status">地震情報を取得しています…</div>
+    <div class="tabs">
+      <button class="tab active" data-view="today">今日</button>
+      <button class="tab" data-view="month">月</button>
+      <button class="tab" data-view="year">年</button>
+      <button class="tab" data-view="recent">直近</button>
+    </div>
+    <div id="summary"></div>
+    <div id="latest">---</div>
+    <div id="list"></div>
+  </div>
+  <div id="legend">● 震源　高さ = 深さ　大きさ = M</div>
+  <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x071018);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, .1, 5000);
+camera.position.set(0, 420, 520);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+document.querySelector('#app').appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0,0,0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.8));
+
+const grid = new THREE.GridHelper(900, 30, 0x30414c, 0x17242d);
+grid.rotation.x = 0;
+scene.add(grid);
+
+// 日本の緯度経度をThree.jsのローカル座標へ。
+// 地図はおおよそ日本全体が画面に入るスケール。
+const LON0 = 137.0;
+const LAT0 = 36.0;
+const SX = 28;
+const SZ = 32;
+const DEPTH_SCALE = 3.0;
+
+function geoTo3D(lon, lat, depth=0) {
+  return new THREE.Vector3(
+    (lon - LON0) * SX,
+    -depth * DEPTH_SCALE,
+    -(lat - LAT0) * SZ
+  );
+}
+
+const mapGroup = new THREE.Group();
+scene.add(mapGroup);
+
+// GeoJSONをThree.jsの線として描画
+function addGeoJSON(obj) {
+  const lineMat = new THREE.LineBasicMaterial({color:0x8fa9b8});
+  const fillMat = new THREE.MeshBasicMaterial({
+    color:0x10232c, transparent:true, opacity:.55,
+    side:THREE.DoubleSide
+  });
+
+  function polygon(coords) {
+    const shape = new THREE.Shape();
+    const pts = [];
+    coords.forEach((p,i)=>{
+      const v=geoTo3D(p[0],p[1],0);
+      pts.push(new THREE.Vector2(v.x,-v.z));
+      if(i===0) shape.moveTo(v.x,-v.z); else shape.lineTo(v.x,-v.z);
+    });
+    shape.closePath();
+
+    const geo = new THREE.ShapeGeometry(shape);
+    const mesh = new THREE.Mesh(geo,fillMat);
+    mesh.rotation.x=-Math.PI/2;
+    mapGroup.add(mesh);
+
+    const linePts = coords.map(p=>geoTo3D(p[0],p[1],0.2));
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+    mapGroup.add(new THREE.Line(lineGeo,lineMat));
+  }
+
+  function geometry(g) {
+    if(g.type==='Polygon') g.coordinates.forEach(polygon);
+    if(g.type==='MultiPolygon') g.coordinates.forEach(mp=>mp.forEach(polygon));
+  }
+  obj.features.forEach(f=>geometry(f.geometry));
+}
+
+// 公開GeoJSON（都道府県境）
+const GEOJSON_URL='https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson';
+
+async function loadMap(){
+  const r=await fetch(GEOJSON_URL);
+  if(!r.ok) throw new Error('日本地図の取得に失敗');
+  addGeoJSON(await r.json());
+}
+
+// 地震
+const quakeGroup = new THREE.Group();
+scene.add(quakeGroup);
+
+const quakeMeshes = new Map();
+
+function scaleForMagnitude(m){
+  if(!Number.isFinite(m) || m < 0) return 1.5;
+  return Math.max(1.5, Math.pow(1.7, m-2.5));
+}
+
+function addQuake(q){
+  const h=q.earthquake?.hypocenter;
+  if(!h) return;
+  if(h.latitude <= -100 || h.longitude <= -100 || h.depth < 0) return;
+  if(quakeMeshes.has(q.id)) return;
+
+  const p=geoTo3D(h.longitude,h.latitude,h.depth);
+  const radius=Math.min(scaleForMagnitude(h.magnitude),18);
+
+  const geo=new THREE.SphereGeometry(radius,20,14);
+  const mat=new THREE.MeshBasicMaterial({color:0xff7043});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.copy(p);
+  mesh.userData={q};
+  quakeGroup.add(mesh);
+  quakeMeshes.set(q.id,mesh);
+
+  // 地表位置から震源までの線
+  const surface=geoTo3D(h.longitude,h.latitude,0);
+  const lineGeo=new THREE.BufferGeometry().setFromPoints([surface,p]);
+  const lineMat=new THREE.LineBasicMaterial({color:0xff7043,transparent:true,opacity:.28});
+  quakeGroup.add(new THREE.Line(lineGeo,lineMat));
+}
+
+let earthquakes = [];
+let currentView = 'today';
+
+function validEarthquake(q){
+  const h=q?.earthquake?.hypocenter;
+  return q?.code===551 && h && h.latitude>-100 && h.longitude>-100 && h.depth>=0;
+}
+
+function quakeDate(q){
+  return new Date(q.earthquake.time);
+}
+
+function formatTime(q){
+  const d=quakeDate(q);
+  return d.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function magnitude(q){
+  const m=q.earthquake.hypocenter.magnitude;
+  return m>=0 ? `M${m.toFixed(1)}` : 'M--';
+}
+
+function viewItems(){
+  const now=new Date();
+  const start=new Date(now);
+  if(currentView==='today'){
+    start.setHours(0,0,0,0);
+  }else if(currentView==='month'){
+    start.setDate(1); start.setHours(0,0,0,0);
+  }else if(currentView==='year'){
+    start.setMonth(0,1); start.setHours(0,0,0,0);
+  }else{
+    return earthquakes.slice(0,20);
+  }
+  return earthquakes.filter(q=>quakeDate(q)>=start);
+}
+
+function renderDashboard(){
+  const items=viewItems();
+  const labels={today:'今日',month:'今月',year:'今年',recent:'直近20件'};
+  document.querySelector('#summary').textContent=`${labels[currentView]}：${items.length}件`;
+
+  const latest=items[0] || earthquakes[0];
+  if(latest){
+    const h=latest.earthquake.hypocenter;
+    const d=h.depth>=0 ? `${h.depth} km` : '不明';
+    document.querySelector('#latest').innerHTML=
+      `<b>最新：${h.name||'震源不明'}</b><br>${magnitude(latest)} / 深さ ${d} / ${formatTime(latest)}`;
+  }else{
+    document.querySelector('#latest').textContent='該当する地震はありません';
+  }
+
+  const list=document.querySelector('#list');
+  list.innerHTML='';
+  items.forEach(q=>{
+    const h=q.earthquake.hypocenter;
+    const row=document.createElement('div');
+    row.className='quake-row';
+    row.innerHTML=
+      `<div class="quake-title"><span class="badge">${magnitude(q)}</span>${h.name||'震源不明'}</div>`+
+      `<div class="quake-meta">${formatTime(q)}　深さ ${h.depth} km　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
+    row.onclick=()=>{
+      const mesh=quakeMeshes.get(q.id);
+      if(mesh){
+        controls.target.copy(mesh.position);
+        camera.position.copy(mesh.position).add(new THREE.Vector3(70,70,70));
+      }
+    };
+    list.appendChild(row);
+  });
+}
+
+function setView(view){
+  currentView=view;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  renderDashboard();
+}
+
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+
+async function loadHistory(){
+  const url='https://api.p2pquake.net/v2/history?codes=551&limit=100';
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`API HTTP ${r.status}`);
+  const data=await r.json();
+  earthquakes=data.filter(validEarthquake).sort((a,b)=>quakeDate(b)-quakeDate(a));
+  earthquakes.forEach(addQuake);
+  renderDashboard();
+  document.querySelector('#status').textContent=`過去${earthquakes.length}件を取得 / WebSocket待機中`;
+}
+
+function connectWS(){
+  const ws=new WebSocket('wss://api.p2pquake.net/v2/ws');
+  ws.onopen=()=>document.querySelector('#status').textContent='接続中 — 新しい地震を待っています';
+  ws.onmessage=e=>{
+    try{
+      const q=JSON.parse(e.data);
+      if(validEarthquake(q)){
+        if(!earthquakes.some(x=>x.id===q.id)){
+          earthquakes.unshift(q);
+          addQuake(q);
+        }
+        renderDashboard();
+        document.querySelector('#status').textContent='リアルタイム受信中';
+      }
+    }catch(err){}
+  };
+  ws.onerror=()=>document.querySelector('#status').textContent='WebSocket接続エラー（履歴表示は継続）';
+  ws.onclose=()=>setTimeout(connectWS,5000);
+}
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+(async()=>{
+  try{
+    await loadMap();
+    await loadHistory();
+    connectWS();
+  }catch(e){
+    console.error(e);
+    document.querySelector('#status').textContent='取得エラー: '+e.message;
+  }
+})();
+
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
