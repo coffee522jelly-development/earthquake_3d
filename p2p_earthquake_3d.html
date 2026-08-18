@@ -17,7 +17,13 @@ h1{font-size:16px;margin:0 0 8px}
 .tab{border:1px solid #3a4d59;background:#12202a;color:#b8c8d1;border-radius:6px;padding:6px 5px;cursor:pointer;font-size:12px}
 .tab:hover{background:#1a2d38}
 .tab.active{background:#29404d;color:#fff;border-color:#617987}
-#list{margin-top:10px;max-height:290px;overflow:auto;border-top:1px solid #263842}
+#list{margin-top:10px;max-height:290px;overflow-y:auto;border-top:1px solid #263842}
+#list::-webkit-scrollbar{width:5px}
+#list::-webkit-scrollbar-track{background:transparent}
+#list::-webkit-scrollbar-thumb{background:#3a4d59;border-radius:10px}
+#list::-webkit-scrollbar-thumb:hover{background:#5a7282}
+body.light-mode #list::-webkit-scrollbar-thumb{background:#cbd5e1}
+body.light-mode #list::-webkit-scrollbar-thumb:hover{background:#94a3b8}
 .quake-row{padding:8px 3px;border-bottom:1px solid #263842;cursor:pointer}
 .quake-row:hover{background:rgba(255,255,255,.04)}
 .quake-title{font-weight:600;font-size:12px}
@@ -58,8 +64,8 @@ body.light-mode #help{color:#64748b}
     <div id="status">地震情報を取得しています…</div>
     <div class="tabs">
       <button class="tab active" data-view="today">今日</button>
+      <button class="tab" data-view="week">週</button>
       <button class="tab" data-view="month">月</button>
-      <button class="tab" data-view="year">年</button>
       <button class="tab" data-view="recent">直近</button>
     </div>
     <div id="summary"></div>
@@ -68,7 +74,10 @@ body.light-mode #help{color:#64748b}
   </div>
   <div id="top-right">
     <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
-    <div id="legend">● 震源 (赤: 浅 ～ 青: 深 / 半透明)　高さ = 深さ　大きさ = M</div>
+    <div id="legend">
+      <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
+      <div>― 赤太線: プレート境界 / 主な活断層構造線</div>
+    </div>
   </div>
   <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
 </div>
@@ -131,7 +140,10 @@ function geoTo3D(lon, lat, depth=0) {
 const mapGroup = new THREE.Group();
 worldGroup.add(mapGroup);
 
-let mapLineMat, mapFillMat;
+const faultGroup = new THREE.Group();
+worldGroup.add(faultGroup);
+
+let mapLineMat, mapFillMat, faultLineMat;
 
 // GeoJSONをThree.jsの線として描画
 function addGeoJSON(obj) {
@@ -171,10 +183,43 @@ function addGeoJSON(obj) {
 // 公開GeoJSON（都道府県境）
 const GEOJSON_URL='https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson';
 
+// 日本周辺の主要プレート境界・大構造線（南海トラフ、日本海溝、糸魚川-静岡構造線、中央構造線、千島海溝など）
+const MAJOR_FAULTS = [
+  // 南海トラフ (Nankai Trough)
+  [[130.5, 30.5], [132.0, 31.5], [134.0, 32.5], [136.0, 33.2], [138.0, 34.0], [139.0, 34.8]],
+  // 日本海溝・相模トラフ (Japan Trench / Sagami Trough)
+  [[139.0, 34.8], [140.5, 35.0], [142.0, 36.5], [143.5, 38.5], [144.5, 40.5], [145.0, 42.0]],
+  // 千島海溝 (Kuril Trench)
+  [[145.0, 42.0], [147.0, 43.5], [149.0, 45.0]],
+  // 中央構造線 (Median Tectonic Line - MTL)
+  [[130.0, 32.5], [132.5, 33.5], [134.5, 34.0], [136.5, 34.5], [138.0, 35.0]],
+  // 糸魚川-静岡構造線 (Itoigawa-Shizuoka Tectonic Line)
+  [[137.8, 37.0], [137.9, 36.3], [138.2, 35.7], [138.5, 35.0]],
+  // 日本海東縁変動帯 (Eastern Margin of Japan Sea)
+  [[139.5, 41.5], [139.2, 40.0], [138.8, 38.5], [137.5, 37.0]],
+  // 琉球トラフ (Ryukyu Trench)
+  [[123.0, 24.0], [126.0, 26.5], [129.0, 29.0], [130.5, 30.5]]
+];
+
+function addFaults() {
+  faultLineMat = new THREE.LineBasicMaterial({
+    color: 0xef4444,
+    linewidth: 2.5
+  });
+
+  MAJOR_FAULTS.forEach(coords => {
+    const pts = coords.map(p => geoTo3D(p[0], p[1], 0.5));
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geo, faultLineMat);
+    faultGroup.add(line);
+  });
+}
+
 async function loadMap(){
   const r=await fetch(GEOJSON_URL);
   if(!r.ok) throw new Error('日本地図の取得に失敗');
   addGeoJSON(await r.json());
+  addFaults();
 }
 
 // 地震
@@ -255,10 +300,10 @@ function viewItems(){
   const start=new Date(now);
   if(currentView==='today'){
     start.setHours(0,0,0,0);
+  }else if(currentView==='week'){
+    start.setDate(now.getDate() - 7);
   }else if(currentView==='month'){
     start.setDate(1); start.setHours(0,0,0,0);
-  }else if(currentView==='year'){
-    start.setMonth(0,1); start.setHours(0,0,0,0);
   }else{
     return earthquakes.slice(0,20);
   }
@@ -282,7 +327,7 @@ function renderDashboard(){
     line.visible=isVisible;
   });
 
-  const labels={today:'今日',month:'今月',year:'今年',recent:'直近20件'};
+  const labels={today:'今日',week:'今週（直近7日）',month:'今月',recent:'直近20件'};
   document.querySelector('#summary').textContent=`${labels[currentView]}：${items.length}件`;
 
   const latest=items[0] || earthquakes[0];
@@ -383,6 +428,7 @@ function toggleTheme(){
     grid.material.opacity = 0.35;
     if(mapLineMat) mapLineMat.color.set(0x64748b);
     if(mapFillMat) mapFillMat.color.set(0xe2e8f0);
+    if(faultLineMat) faultLineMat.color.set(0xd97706);
   } else {
     scene.background.set(0x071018);
     grid.material.color.set(0xffffff);
@@ -390,6 +436,7 @@ function toggleTheme(){
     grid.material.opacity = 1.0;
     if(mapLineMat) mapLineMat.color.set(0x8fa9b8);
     if(mapFillMat) mapFillMat.color.set(0x10232c);
+    if(faultLineMat) faultLineMat.color.set(0xef4444);
   }
 }
 
