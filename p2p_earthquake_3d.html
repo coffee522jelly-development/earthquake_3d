@@ -426,6 +426,63 @@ function getDepthColor(depth){
   return new THREE.Color().setHSL(hue, 1.0, 0.5);
 }
 
+function createTextSprite(text, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.font = 'Bold 44px system-ui, sans-serif';
+  ctx.fillStyle = '#' + color.getHexString();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 10, 64);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(32, 16, 1);
+  return sprite;
+}
+
+const depthRulerGroup = new THREE.Group();
+worldGroup.add(depthRulerGroup);
+
+function createDepthRuler() {
+  const rulerLon = 146.5;
+  const rulerLat = 34.5;
+  const depths = [0, 50, 100, 150, 200, 250, 300];
+
+  const pTop = geoTo3D(rulerLon, rulerLat, 0);
+  const pBottom = geoTo3D(rulerLon, rulerLat, 300);
+
+  // 主軸垂直線
+  const axisGeo = new THREE.BufferGeometry().setFromPoints([pTop, pBottom]);
+  const axisMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.8 });
+  depthRulerGroup.add(new THREE.Line(axisGeo, axisMat));
+
+  // 深度目盛り (Ticks & Labels)
+  depths.forEach(d => {
+    const p = geoTo3D(rulerLon, rulerLat, d);
+    const color = getDepthColor(d);
+
+    // 横フック目盛り線
+    const pEnd = p.clone().add(new THREE.Vector3(12, 0, 0));
+    const tickGeo = new THREE.BufferGeometry().setFromPoints([p, pEnd]);
+    const tickMat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+    depthRulerGroup.add(new THREE.Line(tickGeo, tickMat));
+
+    // 深度テキストラベル ("0km", "50km", ...)
+    const label = createTextSprite(`${d}km`, color);
+    label.position.copy(pEnd).add(new THREE.Vector3(18, 0, 0));
+    depthRulerGroup.add(label);
+  });
+}
+createDepthRuler();
+
 function scaleForMagnitude(m){
   if(!Number.isFinite(m) || m < 0) return 1.5;
   return Math.max(1.5, Math.pow(1.7, m-2.5));
