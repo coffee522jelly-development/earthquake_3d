@@ -174,13 +174,38 @@ function getElevation(lon, lat) {
   return h;
 }
 
-function geoTo3D(lon, lat, depth=0) {
-  const elev = (depth === 0) ? getElevation(lon, lat) : 0;
+function geoTo3D(lon, lat, depth=0, surfaceOffset=0) {
+  // 震源 (depth > 0) 以外の地表フィーチャ (活断層・境界線等) は標高getElevationを常に反映
+  const elev = getElevation(lon, lat);
+  const y = (depth > 0) ? -depth * DEPTH_SCALE : (elev + surfaceOffset);
   return new THREE.Vector3(
     (lon - LON0) * SX,
-    elev - depth * DEPTH_SCALE,
+    y,
     -(lat - LAT0) * SZ
   );
+}
+
+// 2点間(lon1, lat1) -> (lon2, lat2) を細分化して地形(3D標高)に綺麗に沿わせる
+function interpolateLine(coords, maxStep = 0.05, surfaceOffset = 0.6) {
+  const resultPts = [];
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(dist / maxStep));
+
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const lon = p1[0] + dx * t;
+      const lat = p1[1] + dy * t;
+      resultPts.push(geoTo3D(lon, lat, 0, surfaceOffset));
+    }
+  }
+  const last = coords[coords.length - 1];
+  resultPts.push(geoTo3D(last[0], last[1], 0, surfaceOffset));
+  return resultPts;
 }
 
 const mapGroup = new THREE.Group();
@@ -212,7 +237,6 @@ function addGeoJSON(obj) {
     shape.closePath();
 
     const geo = new THREE.ShapeGeometry(shape);
-    // 2D ShapeGeometryの各頂点(x, y, 0)に対して、元の(lon, lat)から標高Yを設定
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const vx = pos.getX(i);
@@ -220,7 +244,7 @@ function addGeoJSON(obj) {
       const lon = LON0 + vx / SX;
       const lat = LAT0 - vz / SZ;
       const elev = getElevation(lon, lat);
-      pos.setZ(i, elev); // ShapeGeometryはZ=0平面なのでZをY標高（回転後Y軸方向）に設定
+      pos.setZ(i, elev);
     }
     geo.computeVertexNormals();
 
@@ -228,7 +252,8 @@ function addGeoJSON(obj) {
     mesh.rotation.x=-Math.PI/2;
     mapGroup.add(mesh);
 
-    const linePts = coords.map(p=>geoTo3D(p[0],p[1],0));
+    // 都道府県境界線を細分化して3D地形に沿わせる (表面オフセット +0.35)
+    const linePts = interpolateLine(coords, 0.05, 0.35);
     const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
     mapGroup.add(new THREE.Line(lineGeo,mapLineMat));
   }
@@ -295,7 +320,8 @@ function addFaults() {
       color: item.color,
       linewidth: 2.5
     });
-    const pts = item.coords.map(p => geoTo3D(p[0], p[1], 0.5));
+    // 活断層・構造線を細分化補間して3D地形の表面(+0.65)に沿って描画
+    const pts = interpolateLine(item.coords, 0.04, 0.65);
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const line = new THREE.Line(geo, mat);
     faultGroup.add(line);
