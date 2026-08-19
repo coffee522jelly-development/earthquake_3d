@@ -73,7 +73,10 @@ body.light-mode #help{color:#64748b}
     <div id="list"></div>
   </div>
   <div id="top-right">
-    <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
+    <div style="display:flex;gap:8px">
+      <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
+      <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
+    </div>
     <div id="legend">
       <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
       <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
@@ -82,6 +85,9 @@ body.light-mode #help{color:#64748b}
         <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
         <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
         <span style="color:#ec4899">━</span> プレート境界・海溝系
+      </div>
+      <div style="margin-top:4px;font-size:11px;color:#38bdf8">
+        ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
       </div>
     </div>
   </div>
@@ -213,6 +219,10 @@ worldGroup.add(mapGroup);
 
 const faultGroup = new THREE.Group();
 worldGroup.add(faultGroup);
+
+const jshisGroup = new THREE.Group();
+worldGroup.add(jshisGroup);
+jshisGroup.visible = false;
 
 let mapLineMat, mapFillMat, faultLineMat;
 
@@ -517,7 +527,40 @@ function addQuake(q){
   const line=new THREE.Line(lineGeo,lineMat);
   quakeGroup.add(line);
 
-  quakeMeshes.set(q.id, {mesh, line});
+  // 震源横のマグニチュード & 深さテキストラベル
+  const label = createQuakeLabel(magnitude(q), h.depth, color);
+  label.position.copy(p).add(new THREE.Vector3(radius + 6, 2, 0));
+  quakeGroup.add(label);
+
+  quakeMeshes.set(q.id, {mesh, line, label});
+}
+
+function createQuakeLabel(magText, depthKm, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.font = 'Bold 28px system-ui, -apple-system, sans-serif';
+  const text = `${magText} (${depthKm}km)`;
+
+  // 高視認性のための黒縁取りストローク
+  ctx.strokeStyle = 'rgba(5, 12, 18, 0.85)';
+  ctx.lineWidth = 6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(text, 10, 38);
+
+  ctx.fillStyle = '#' + color.getHexString();
+  ctx.fillText(text, 10, 38);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(30, 7.5, 1);
+  return sprite;
 }
 
 let earthquakes = [];
@@ -568,10 +611,11 @@ function getMagnitudeBadgeClass(q){
 function renderDashboard(){
   const items=viewItems();
   const visibleIds=new Set(items.map(q=>q.id));
-  quakeMeshes.forEach(({mesh, line}, id)=>{
+  quakeMeshes.forEach(({mesh, line, label}, id)=>{
     const isVisible=visibleIds.has(id);
     mesh.visible=isVisible;
     line.visible=isVisible;
+    if(label) label.visible=isVisible;
   });
 
   const labels={today:'今日',week:'今週（直近7日）',month:'今月',recent:'直近20件'};
@@ -687,6 +731,94 @@ function toggleTheme(){
 }
 
 document.querySelector('#theme-toggle').addEventListener('click', toggleTheme);
+
+let isJshisLoaded = false;
+const JSHIS_SAMPLE_MESHES = ['54401047N', '53394526N', '53393596N', '53394621N'];
+
+async function loadJshisSubsurfaceData() {
+  if (isJshisLoaded) return;
+  document.querySelector('#status').textContent = 'J-SHIS 深部地下構造メッシュを取得中…';
+
+  const jshisMat = new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    roughness: 0.4,
+    metalness: 0.3,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide
+  });
+
+  const jshisEdgeMat = new THREE.LineBasicMaterial({
+    color: 0x0284c7,
+    linewidth: 2
+  });
+
+  for (const code of JSHIS_SAMPLE_MESHES) {
+    try {
+      const url = `https://www.j-shis.bosai.go.jp/map/api/dstrct/V1/LYRD/meshinfo.geojson?meshcode=${code}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+
+      data.features?.forEach(feat => {
+        const coords = feat.geometry?.coordinates?.[0];
+        const depthMeters = parseFloat(feat.properties?.tn32 || '3000'); // S波速度3.2km/s基盤深度 (m)
+        const depthKm = depthMeters / 1000.0;
+
+        if (coords && coords.length >= 3) {
+          const shape = new THREE.Shape();
+          coords.forEach((p, i) => {
+            const v = geoTo3D(p[0], p[1], depthKm);
+            if (i === 0) shape.moveTo(v.x, -v.z);
+            else shape.lineTo(v.x, -v.z);
+          });
+          shape.closePath();
+
+          const geo = new THREE.ShapeGeometry(shape);
+          const pos = geo.attributes.position;
+          for (let i = 0; i < pos.count; i++) {
+            const vx = pos.getX(i);
+            const vz = -pos.getY(i);
+            const lon = LON0 + vx / SX;
+            const lat = LAT0 - vz / SZ;
+            const p3d = geoTo3D(lon, lat, depthKm);
+            pos.setZ(i, p3d.y);
+          }
+          geo.computeVertexNormals();
+
+          const mesh = new THREE.Mesh(geo, jshisMat);
+          mesh.rotation.x = -Math.PI / 2;
+          jshisGroup.add(mesh);
+
+          // メッシュ枠線
+          const edgePts = coords.map(p => geoTo3D(p[0], p[1], depthKm));
+          const edgeGeo = new THREE.BufferGeometry().setFromPoints(edgePts);
+          jshisGroup.add(new THREE.Line(edgeGeo, jshisEdgeMat));
+        }
+      });
+    } catch (e) {
+      console.warn('J-SHIS fetch error for mesh', code, e);
+    }
+  }
+
+  isJshisLoaded = true;
+  document.querySelector('#status').textContent = 'J-SHIS 地盤構造レイヤー表示中';
+}
+
+document.querySelector('#jshis-toggle').addEventListener('click', async () => {
+  jshisGroup.visible = !jshisGroup.visible;
+  const btn = document.querySelector('#jshis-toggle');
+  if (jshisGroup.visible) {
+    btn.style.background = '#0284c7';
+    btn.style.borderColor = '#38bdf8';
+    btn.style.color = '#ffffff';
+    await loadJshisSubsurfaceData();
+  } else {
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }
+});
 
 window.addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
