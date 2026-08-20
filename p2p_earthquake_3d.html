@@ -554,20 +554,22 @@ function initVolcanoes() {
     const p = geoTo3D(v.lon, v.lat, 0, 1.2);
     const color = getVolcanoLevelColor(v.level);
 
-    // 3D 火山マーカー (円錐)
-    const coneGeo = new THREE.ConeGeometry(3.5, 9.0, 12);
-    const coneMat = new THREE.MeshStandardMaterial({
+    // 山頂の点（スフィア）マーカー
+    const dotGeo = new THREE.SphereGeometry(2.0, 16, 16);
+    const dotMat = new THREE.MeshStandardMaterial({
       color: color,
-      roughness: 0.3,
-      metalness: 0.2
+      roughness: 0.2,
+      metalness: 0.1,
+      emissive: color,
+      emissiveIntensity: 0.4
     });
-    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-    coneMesh.position.copy(p).add(new THREE.Vector3(0, 4.5, 0));
-    volcanoGroup.add(coneMesh);
+    const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+    dotMesh.position.copy(p);
+    volcanoGroup.add(dotMesh);
 
     // 3D 火山名＆噴火警戒レベルラベル
     const label = createVolcanoLabel(v);
-    label.position.copy(p).add(new THREE.Vector3(0, 14.0, 0));
+    label.position.copy(p).add(new THREE.Vector3(0, 8.0, 0));
     volcanoGroup.add(label);
   });
 }
@@ -661,7 +663,7 @@ function addQuake(q){
   label.position.copy(p).add(new THREE.Vector3(radius + 6, 2, 0));
   quakeGroup.add(label);
 
-  quakeMeshes.set(q.id, {mesh, line, label});
+  quakeMeshes.set(q.id, {mesh, line, label, q});
 }
 
 // 衝撃波（波紋）エフェクト管理
@@ -864,6 +866,7 @@ function renderDashboard(){
   initTimelapseTimeline();
   applyTimelapseVisibility();
 
+  const items = viewItems();
   const labels={today:'今日',week:'今週（直近7日）',month:'今月',recent:'直近20件'};
   document.querySelector('#summary').textContent=`${labels[currentView]}：${items.length}件`;
 
