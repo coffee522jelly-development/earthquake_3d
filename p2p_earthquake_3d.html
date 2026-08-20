@@ -86,6 +86,7 @@ body.light-mode #help{color:#64748b}
   </div>
   <div id="top-right">
     <div style="display:flex;gap:8px">
+      <button id="volcano-toggle" class="theme-btn" style="background:#ea580c;border-color:#f97316;color:#fff">🌋 活火山</button>
       <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
       <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
     </div>
@@ -100,6 +101,9 @@ body.light-mode #help{color:#64748b}
       </div>
       <div style="margin-top:4px;font-size:11px;color:#38bdf8">
         ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
+      </div>
+      <div style="margin-top:4px;font-size:11px;color:#f97316">
+        ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
       </div>
     </div>
   </div>
@@ -487,6 +491,101 @@ function createTextSprite(text, color) {
   sprite.scale.set(32, 16, 1);
   return sprite;
 }
+
+const volcanoGroup = new THREE.Group();
+worldGroup.add(volcanoGroup);
+
+const ACTIVE_VOLCANOES = [
+  { name: '桜島', lon: 130.657, lat: 31.593, level: 3, levelText: '入山規制' },
+  { name: '阿蘇山', lon: 131.086, lat: 32.884, level: 2, levelText: '火口周辺規制' },
+  { name: '諏訪之瀬島', lon: 129.716, lat: 29.638, level: 2, levelText: '火口周辺規制' },
+  { name: '浅間山', lon: 138.523, lat: 36.406, level: 2, levelText: '火口周辺規制' },
+  { name: '霧島山(新燃岳)', lon: 130.884, lat: 31.911, level: 2, levelText: '火口周辺規制' },
+  { name: '薩摩硫黄島', lon: 130.306, lat: 30.793, level: 2, levelText: '火口周辺規制' },
+  { name: '富士山', lon: 138.727, lat: 35.361, level: 1, levelText: '活火山留意' },
+  { name: '草津白根山', lon: 138.528, lat: 36.644, level: 1, levelText: '活火山留意' },
+  { name: '箱根山', lon: 139.022, lat: 35.233, level: 1, levelText: '活火山留意' },
+  { name: '十勝岳', lon: 142.686, lat: 43.417, level: 1, levelText: '活火山留意' },
+  { name: '伊豆大島', lon: 139.398, lat: 34.727, level: 1, levelText: '活火山留意' },
+  { name: '樽前山', lon: 141.378, lat: 42.690, level: 1, levelText: '活火山留意' }
+];
+
+function getVolcanoLevelColor(level) {
+  switch(level) {
+    case 5: return new THREE.Color(0xa855f7); // 紫
+    case 4: return new THREE.Color(0xef4444); // 赤
+    case 3: return new THREE.Color(0xf97316); // オレンジ
+    case 2: return new THREE.Color(0xeab308); // 黄
+    default: return new THREE.Color(0x22c55e); // 緑
+  }
+}
+
+function createVolcanoLabel(v) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 384;
+  canvas.height = 72;
+  const ctx = canvas.getContext('2d');
+
+  const color = getVolcanoLevelColor(v.level);
+  const text = `🌋 ${v.name} [Lv.${v.level}: ${v.levelText}]`;
+
+  ctx.font = 'Bold 26px system-ui, -apple-system, sans-serif';
+  ctx.strokeStyle = 'rgba(5, 12, 18, 0.9)';
+  ctx.lineWidth = 6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(text, 10, 44);
+
+  ctx.fillStyle = '#' + color.getHexString();
+  ctx.fillText(text, 10, 44);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(45, 8.4, 1);
+  return sprite;
+}
+
+function initVolcanoes() {
+  ACTIVE_VOLCANOES.forEach(v => {
+    const p = geoTo3D(v.lon, v.lat, 0, 1.2);
+    const color = getVolcanoLevelColor(v.level);
+
+    // 3D 火山マーカー (円錐)
+    const coneGeo = new THREE.ConeGeometry(3.5, 9.0, 12);
+    const coneMat = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.3,
+      metalness: 0.2
+    });
+    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+    coneMesh.position.copy(p).add(new THREE.Vector3(0, 4.5, 0));
+    volcanoGroup.add(coneMesh);
+
+    // 3D 火山名＆噴火警戒レベルラベル
+    const label = createVolcanoLabel(v);
+    label.position.copy(p).add(new THREE.Vector3(0, 14.0, 0));
+    volcanoGroup.add(label);
+  });
+}
+initVolcanoes();
+
+document.querySelector('#volcano-toggle').addEventListener('click', () => {
+  volcanoGroup.visible = !volcanoGroup.visible;
+  const btn = document.querySelector('#volcano-toggle');
+  if (volcanoGroup.visible) {
+    btn.style.background = '#ea580c';
+    btn.style.borderColor = '#f97316';
+    btn.style.color = '#ffffff';
+  } else {
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }
+});
 
 const depthRulerGroup = new THREE.Group();
 worldGroup.add(depthRulerGroup);
