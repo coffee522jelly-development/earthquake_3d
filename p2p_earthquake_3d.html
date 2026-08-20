@@ -9,6 +9,18 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;col
 #app{width:100%;height:100%;position:relative}
 canvas{display:block}
 #hud{position:absolute;left:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);min-width:340px;max-width:calc(100vw - 32px)}
+
+/* Timelapse control bar at bottom center */
+#timelapse-bar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(5,12,18,.88);border:1px solid #30404b;border-radius:12px;padding:10px 18px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:520px;max-width:calc(100vw - 40px)}
+#tl-play{background:#0284c7;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;transition:background .2s ease}
+#tl-play:hover{background:#0369a1}
+#tl-slider{flex:1;height:6px;accent-color:#38bdf8;cursor:pointer}
+#tl-speed{background:#12202a;border:1px solid #3a4d59;color:#e8f0f5;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
+#tl-date{font-size:12px;font-family:monospace;color:#38bdf8;min-width:130px;text-align:right}
+
+body.light-mode #timelapse-bar{background:rgba(255,255,255,.92);border-color:#cfd8dc;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+body.light-mode #tl-speed{background:#e2e8f0;border-color:#cbd5e1;color:#1c2833}
+body.light-mode #tl-date{color:#0284c7}
 h1{font-size:16px;margin:0 0 8px}
 #status{font-size:12px;color:#9fb2be;margin-bottom:8px}
 #latest{font-size:13px;line-height:1.55}
@@ -92,6 +104,18 @@ body.light-mode #help{color:#64748b}
     </div>
   </div>
   <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
+
+  <div id="timelapse-bar">
+    <button id="tl-play">▶ タイムラプス再生</button>
+    <input type="range" id="tl-slider" min="0" max="1000" value="1000">
+    <select id="tl-speed">
+      <option value="1">1x (リアル)</option>
+      <option value="5" selected>5x (標準)</option>
+      <option value="20">20x (高速)</option>
+      <option value="60">60x (爆速)</option>
+    </select>
+    <div id="tl-date">--/-- --:--</div>
+  </div>
 </div>
 
 <script type="importmap">
@@ -137,12 +161,15 @@ grid.rotation.x = 0;
 worldGroup.add(grid);
 
 // 日本の緯度経度をThree.jsのローカル座標へ。
-// 地図はおおよそ日本全体が画面に入るスケール。
+// 地球の曲率 (半径 R = 1800) を反映した球面座標変換。
 const LON0 = 137.0;
 const LAT0 = 36.0;
-const SX = 28;
-const SZ = 32;
+const R_EARTH = 1800.0;
 const DEPTH_SCALE = 3.0;
+
+const RAD = Math.PI / 180.0;
+const sinLat0 = Math.sin(LAT0 * RAD);
+const cosLat0 = Math.cos(LAT0 * RAD);
 
 // 山の標高データ近似関数 (日本列島の主要山脈・山地)
 function getElevation(lon, lat) {
@@ -181,14 +208,21 @@ function getElevation(lon, lat) {
 }
 
 function geoTo3D(lon, lat, depth=0, surfaceOffset=0) {
-  // 震源 (depth > 0) 以外の地表フィーチャ (活断層・境界線等) は標高getElevationを常に反映
   const elev = getElevation(lon, lat);
-  const y = (depth > 0) ? -depth * DEPTH_SCALE : (elev + surfaceOffset);
-  return new THREE.Vector3(
-    (lon - LON0) * SX,
-    y,
-    -(lat - LAT0) * SZ
-  );
+  const r = R_EARTH + (depth > 0 ? -depth * DEPTH_SCALE : (elev + surfaceOffset));
+
+  const dLon = (lon - LON0) * RAD;
+  const phi = lat * RAD;
+  const sinPhi = Math.sin(phi);
+  const cosPhi = Math.cos(phi);
+  const cosDLon = Math.cos(dLon);
+  const sinDLon = Math.sin(dLon);
+
+  const x = r * cosPhi * sinDLon;
+  const y = r * (sinPhi * sinLat0 + cosPhi * cosLat0 * cosDLon) - R_EARTH;
+  const z = -r * (sinPhi * cosLat0 - cosPhi * sinLat0 * cosDLon);
+
+  return new THREE.Vector3(x, y, z);
 }
 
 // 2点間(lon1, lat1) -> (lon2, lat2) を細分化して地形(3D標高)に綺麗に沿わせる
@@ -241,31 +275,27 @@ function addGeoJSON(obj) {
   function polygon(coords) {
     const shape = new THREE.Shape();
     coords.forEach((p,i)=>{
-      const v=geoTo3D(p[0],p[1],0);
-      if(i===0) shape.moveTo(v.x,-v.z); else shape.lineTo(v.x,-v.z);
+      if(i===0) shape.moveTo(p[0], p[1]); else shape.lineTo(p[0], p[1]);
     });
     shape.closePath();
 
     const geo = new THREE.ShapeGeometry(shape);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      const vx = pos.getX(i);
-      const vz = -pos.getY(i); // rotation.x = -Math.PI/2 を考慮
-      const lon = LON0 + vx / SX;
-      const lat = LAT0 - vz / SZ;
-      const elev = getElevation(lon, lat);
-      pos.setZ(i, elev);
+      const lon = pos.getX(i);
+      const lat = pos.getY(i);
+      const p3d = geoTo3D(lon, lat, 0);
+      pos.setXYZ(i, p3d.x, p3d.y, p3d.z);
     }
     geo.computeVertexNormals();
 
-    const mesh = new THREE.Mesh(geo,mapFillMat);
-    mesh.rotation.x=-Math.PI/2;
+    const mesh = new THREE.Mesh(geo, mapFillMat);
     mapGroup.add(mesh);
 
     // 都道府県境界線を細分化して3D地形に沿わせる (表面オフセット +0.35)
     const linePts = interpolateLine(coords, 0.05, 0.35);
     const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
-    mapGroup.add(new THREE.Line(lineGeo,mapLineMat));
+    mapGroup.add(new THREE.Line(lineGeo, mapLineMat));
   }
 
   function geometry(g) {
@@ -535,6 +565,51 @@ function addQuake(q){
   quakeMeshes.set(q.id, {mesh, line, label});
 }
 
+// 衝撃波（波紋）エフェクト管理
+const shockwaves = [];
+const shockwaveGroup = new THREE.Group();
+worldGroup.add(shockwaveGroup);
+
+function createShockwave(pos, color, mag) {
+  const ringGeo = new THREE.RingGeometry(0.5, 2.0, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.8,
+    depthWrite: false
+  });
+  const mesh = new THREE.Mesh(ringGeo, ringMat);
+  mesh.position.copy(pos);
+  mesh.rotation.x = -Math.PI / 2;
+  shockwaveGroup.add(mesh);
+
+  shockwaves.push({
+    mesh,
+    maxRadius: Math.max(15, scaleForMagnitude(mag) * 6),
+    currentRadius: 1,
+    opacity: 0.85
+  });
+}
+
+function updateShockwaves(dt) {
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    const sw = shockwaves[i];
+    sw.currentRadius += dt * 35.0;
+    sw.opacity -= dt * 0.9;
+
+    if (sw.opacity <= 0 || sw.currentRadius >= sw.maxRadius) {
+      shockwaveGroup.remove(sw.mesh);
+      sw.mesh.geometry.dispose();
+      sw.mesh.material.dispose();
+      shockwaves.splice(i, 1);
+    } else {
+      sw.mesh.scale.setScalar(sw.currentRadius);
+      sw.mesh.material.opacity = sw.opacity;
+    }
+  }
+}
+
 function createQuakeLabel(magText, depthKm, color) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -565,6 +640,84 @@ function createQuakeLabel(magText, depthKm, color) {
 
 let earthquakes = [];
 let currentView = 'today';
+
+// タイムラプス管理
+let isTimelapsePlaying = false;
+let timelapseStartTime = 0;
+let timelapseEndTime = 0;
+let timelapseCurrentTime = 0;
+let timelapseSpeedMultiplier = 5;
+
+function initTimelapseTimeline() {
+  if (earthquakes.length === 0) return;
+  const times = earthquakes.map(q => quakeDate(q).getTime());
+  timelapseStartTime = Math.min(...times);
+  timelapseEndTime = Math.max(...times);
+  timelapseCurrentTime = timelapseEndTime;
+
+  const slider = document.querySelector('#tl-slider');
+  slider.value = 1000;
+  updateTimelapseDateDisplay();
+}
+
+function updateTimelapseDateDisplay() {
+  const d = new Date(timelapseCurrentTime);
+  document.querySelector('#tl-date').textContent =
+    d.toLocaleString('ja-JP', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+const playBtn = document.querySelector('#tl-play');
+const slider = document.querySelector('#tl-slider');
+const speedSelect = document.querySelector('#tl-speed');
+
+playBtn.addEventListener('click', () => {
+  isTimelapsePlaying = !isTimelapsePlaying;
+  playBtn.textContent = isTimelapsePlaying ? '⏸ 一時停止' : '▶ タイムラプス再生';
+  if (isTimelapsePlaying && timelapseCurrentTime >= timelapseEndTime) {
+    timelapseCurrentTime = timelapseStartTime;
+  }
+});
+
+slider.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value) / 1000.0;
+  timelapseCurrentTime = timelapseStartTime + val * (timelapseEndTime - timelapseStartTime);
+  updateTimelapseDateDisplay();
+  applyTimelapseVisibility();
+});
+
+speedSelect.addEventListener('change', (e) => {
+  timelapseSpeedMultiplier = parseFloat(e.target.value);
+});
+
+function applyTimelapseVisibility() {
+  const items = viewItems();
+  const visibleIds = new Set(
+    items.filter(q => quakeDate(q).getTime() <= timelapseCurrentTime).map(q => q.id)
+  );
+
+  quakeMeshes.forEach(({mesh, line, label, q}, id) => {
+    const qTime = quakeDate(q).getTime();
+    if (visibleIds.has(id)) {
+      mesh.visible = true;
+      line.visible = true;
+      if (label) label.visible = true;
+
+      // 直近発生(3秒以内)にP/S波の波紋アニメーション
+      const diffSec = (timelapseCurrentTime - qTime) / 1000;
+      if (diffSec >= 0 && diffSec < 2.0 && isTimelapsePlaying) {
+        if (!mesh.userData.hasTriggeredShockwave) {
+          createShockwave(mesh.position, mesh.material.color, q.earthquake?.hypocenter?.magnitude);
+          mesh.userData.hasTriggeredShockwave = true;
+        }
+      }
+    } else {
+      mesh.visible = false;
+      line.visible = false;
+      if (label) label.visible = false;
+      if (mesh.userData) mesh.userData.hasTriggeredShockwave = false;
+    }
+  });
+}
 
 function validEarthquake(q){
   const h=q?.earthquake?.hypocenter;
@@ -609,14 +762,8 @@ function getMagnitudeBadgeClass(q){
 }
 
 function renderDashboard(){
-  const items=viewItems();
-  const visibleIds=new Set(items.map(q=>q.id));
-  quakeMeshes.forEach(({mesh, line, label}, id)=>{
-    const isVisible=visibleIds.has(id);
-    mesh.visible=isVisible;
-    line.visible=isVisible;
-    if(label) label.visible=isVisible;
-  });
+  initTimelapseTimeline();
+  applyTimelapseVisibility();
 
   const labels={today:'今日',week:'今週（直近7日）',month:'今月',recent:'直近20件'};
   document.querySelector('#summary').textContent=`${labels[currentView]}：${items.length}件`;
@@ -768,26 +915,22 @@ async function loadJshisSubsurfaceData() {
         if (coords && coords.length >= 3) {
           const shape = new THREE.Shape();
           coords.forEach((p, i) => {
-            const v = geoTo3D(p[0], p[1], depthKm);
-            if (i === 0) shape.moveTo(v.x, -v.z);
-            else shape.lineTo(v.x, -v.z);
+            if (i === 0) shape.moveTo(p[0], p[1]);
+            else shape.lineTo(p[0], p[1]);
           });
           shape.closePath();
 
           const geo = new THREE.ShapeGeometry(shape);
           const pos = geo.attributes.position;
           for (let i = 0; i < pos.count; i++) {
-            const vx = pos.getX(i);
-            const vz = -pos.getY(i);
-            const lon = LON0 + vx / SX;
-            const lat = LAT0 - vz / SZ;
+            const lon = pos.getX(i);
+            const lat = pos.getY(i);
             const p3d = geoTo3D(lon, lat, depthKm);
-            pos.setZ(i, p3d.y);
+            pos.setXYZ(i, p3d.x, p3d.y, p3d.z);
           }
           geo.computeVertexNormals();
 
           const mesh = new THREE.Mesh(geo, jshisMat);
-          mesh.rotation.x = -Math.PI / 2;
           jshisGroup.add(mesh);
 
           // メッシュ枠線
@@ -860,9 +1003,31 @@ function handleXRControllerScale(){
   }
 }
 
+const clock = new THREE.Clock();
+
 function animate(){
+  const dt = clock.getDelta();
   controls.update();
   handleXRControllerScale();
+
+  if (isTimelapsePlaying && timelapseStartTime < timelapseEndTime) {
+    const timeSpan = timelapseEndTime - timelapseStartTime;
+    const step = (timeSpan / 20.0) * dt * timelapseSpeedMultiplier;
+    timelapseCurrentTime += step;
+    if (timelapseCurrentTime >= timelapseEndTime) {
+      timelapseCurrentTime = timelapseEndTime;
+      isTimelapsePlaying = false;
+      const playBtn = document.querySelector('#tl-play');
+      if (playBtn) playBtn.textContent = '▶ タイムラプス再生';
+    }
+    const slider = document.querySelector('#tl-slider');
+    if (slider) slider.value = ((timelapseCurrentTime - timelapseStartTime) / (timelapseEndTime - timelapseStartTime)) * 1000;
+    updateTimelapseDateDisplay();
+    applyTimelapseVisibility();
+  }
+
+  updateShockwaves(dt);
+
   renderer.render(scene,camera);
 }
 renderer.setAnimationLoop(animate);
