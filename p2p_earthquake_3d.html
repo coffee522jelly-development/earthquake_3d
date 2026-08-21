@@ -325,37 +325,37 @@ const COLOR_TROUGH  = 0xec4899;
 
 const MAJOR_FAULTS = [
   // --- 海域プレート境界・巨大トラフ ---
-  { color: COLOR_TROUGH, width: 3.8, coords: [[130.5, 30.5], [132.0, 31.5], [134.0, 32.5], [136.0, 33.2], [138.0, 34.0], [139.0, 34.8]] }, // 南海トラフ
-  { color: COLOR_TROUGH, width: 3.8, coords: [[139.0, 34.8], [140.5, 35.0], [142.0, 36.5], [143.5, 38.5], [144.5, 40.5], [145.0, 42.0]] }, // 日本海溝・相模トラフ
-  { color: COLOR_TROUGH, width: 3.8, coords: [[145.0, 42.0], [147.0, 43.5], [149.0, 45.0]] }, // 千島海溝
-  { color: COLOR_TROUGH, width: 3.8, coords: [[123.0, 24.0], [126.0, 26.5], [129.0, 29.0], [130.5, 30.5]] }, // 琉球トラフ
+  { name: '南海トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[130.5, 30.5], [132.0, 31.5], [134.0, 32.5], [136.0, 33.2], [138.0, 34.0], [139.0, 34.8]] },
+  { name: '日本海溝・相模トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[139.0, 34.8], [140.5, 35.0], [142.0, 36.5], [143.5, 38.5], [144.5, 40.5], [145.0, 42.0]] },
+  { name: '千島海溝', color: COLOR_TROUGH, width: 3.8, coords: [[145.0, 42.0], [147.0, 43.5], [149.0, 45.0]] },
+  { name: '琉球トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[123.0, 24.0], [126.0, 26.5], [129.0, 29.0], [130.5, 30.5]] },
 
   // --- 大構造線 ---
-  { color: COLOR_A_RANK, width: 2.2, coords: [[130.0, 32.5], [132.5, 33.5], [134.5, 34.0], [136.5, 34.5], [138.0, 35.0]] }, // 中央構造線
-  { color: COLOR_S_RANK, width: 2.8, coords: [[137.8, 37.0], [137.9, 36.3], [138.2, 35.7], [138.5, 35.0]] }, // 糸魚川-静岡構造線 (Sランク)
-  { color: COLOR_A_RANK, width: 2.2, coords: [[139.5, 41.5], [139.2, 40.0], [138.8, 38.5], [137.5, 37.0]] }, // 日本海東縁変動帯
+  { name: '中央構造線', color: COLOR_A_RANK, width: 2.2, coords: [[130.0, 32.5], [132.5, 33.5], [134.5, 34.0], [136.5, 34.5], [138.0, 35.0]] },
+  { name: '糸魚川-静岡構造線', color: COLOR_S_RANK, width: 2.8, coords: [[137.8, 37.0], [137.9, 36.3], [138.2, 35.7], [138.5, 35.0]] },
+  { name: '日本海東縁変動帯', color: COLOR_A_RANK, width: 2.2, coords: [[139.5, 41.5], [139.2, 40.0], [138.8, 38.5], [137.5, 37.0]] },
 
   // --- Sランク活断層帯 (30年確率 3%以上) ---
-  { color: COLOR_S_RANK, width: 2.6, coords: [[130.22, 33.72], [130.31, 33.65], [130.40, 33.58], [130.50, 33.48], [130.58, 33.40]] }, // 警固断層帯 (南東部約6%)
-  { color: COLOR_S_RANK, width: 2.6, coords: [[131.20, 33.00], [131.00, 32.88], [130.80, 32.78], [130.60, 32.55], [130.45, 32.30]] }, // 布田川・日奈久断層帯
-  { color: COLOR_S_RANK, width: 2.6, coords: [[134.90, 34.50], [135.02, 34.60], [135.18, 34.72], [135.32, 34.82]] }, // 六甲・淡路島断層帯
-  { color: COLOR_S_RANK, width: 2.6, coords: [[138.05, 36.50], [138.25, 36.70], [138.45, 36.90]] }, // 長野盆地西縁断層帯
-  { color: COLOR_S_RANK, width: 2.6, coords: [[136.60, 36.45], [136.70, 36.60]] }, // 森本・富樫断層帯
+  { name: '警固断層帯', color: COLOR_S_RANK, width: 2.6, coords: [[130.22, 33.72], [130.31, 33.65], [130.40, 33.58], [130.50, 33.48], [130.58, 33.40]] },
+  { name: '布田川・日奈久断層帯', color: COLOR_S_RANK, width: 2.6, coords: [[131.20, 33.00], [131.00, 32.88], [130.80, 32.78], [130.60, 32.55], [130.45, 32.30]] },
+  { name: '六甲・淡路島断層帯', color: COLOR_S_RANK, width: 2.6, coords: [[134.90, 34.50], [135.02, 34.60], [135.18, 34.72], [135.32, 34.82]] },
+  { name: '長野盆地西縁断層帯', color: COLOR_S_RANK, width: 2.6, coords: [[138.05, 36.50], [138.25, 36.70], [138.45, 36.90]] },
+  { name: '森本・富樫断層帯', color: COLOR_S_RANK, width: 2.6, coords: [[136.60, 36.45], [136.70, 36.60]] },
 
   // --- Aランク活断層帯 (30年確率 0.1%〜3%) ---
-  { color: COLOR_A_RANK, width: 2.0, coords: [[139.22, 35.68], [139.35, 35.75], [139.42, 35.82]] }, // 立川断層帯
-  { color: COLOR_A_RANK, width: 2.0, coords: [[139.55, 35.20], [139.70, 35.25]] }, // 三浦半島断層群
-  { color: COLOR_A_RANK, width: 2.0, coords: [[136.80, 36.20], [137.15, 36.35], [137.50, 36.48]] }, // 跡津川断層帯
-  { color: COLOR_A_RANK, width: 2.0, coords: [[136.50, 35.40], [136.62, 35.60], [136.75, 35.80]] }, // 根尾谷断層帯
-  { color: COLOR_A_RANK, width: 2.0, coords: [[133.90, 34.95], [134.30, 35.05], [134.70, 35.12]] }, // 山崎断層帯
-  { color: COLOR_A_RANK, width: 2.0, coords: [[139.00, 35.28], [139.15, 35.35], [139.25, 35.40]] }, // 神縄・国府津-松田断層帯
-  { color: COLOR_A_RANK, width: 2.0, coords: [[138.90, 34.95], [138.95, 35.10]] }, // 北伊豆断層帯
+  { name: '立川断層帯', color: COLOR_A_RANK, width: 2.0, coords: [[139.22, 35.68], [139.35, 35.75], [139.42, 35.82]] },
+  { name: '三浦半島断層群', color: COLOR_A_RANK, width: 2.0, coords: [[139.55, 35.20], [139.70, 35.25]] },
+  { name: '跡津川断層帯', color: COLOR_A_RANK, width: 2.0, coords: [[136.80, 36.20], [137.15, 36.35], [137.50, 36.48]] },
+  { name: '根尾谷断層帯', color: COLOR_A_RANK, width: 2.0, coords: [[136.50, 35.40], [136.62, 35.60], [136.75, 35.80]] },
+  { name: '山崎断層帯', color: COLOR_A_RANK, width: 2.0, coords: [[133.90, 34.95], [134.30, 35.05], [134.70, 35.12]] },
+  { name: '神縄・国府津-松田断層帯', color: COLOR_A_RANK, width: 2.0, coords: [[139.00, 35.28], [139.15, 35.35], [139.25, 35.40]] },
+  { name: '北伊豆断層帯', color: COLOR_A_RANK, width: 2.0, coords: [[138.90, 34.95], [138.95, 35.10]] },
 
   // --- Zランク/その他主要活断層帯 ---
-  { color: COLOR_Z_RANK, width: 1.6, coords: [[129.85, 32.75], [129.95, 32.95], [130.10, 33.20]] }, // 西山断層帯
-  { color: COLOR_Z_RANK, width: 1.6, coords: [[130.05, 32.72], [130.25, 32.75], [130.45, 32.70]] }, // 雲仙断層群
-  { color: COLOR_Z_RANK, width: 1.6, coords: [[135.78, 34.98], [135.83, 35.15], [135.90, 35.35]] }, // 花折断層帯
-  { color: COLOR_Z_RANK, width: 1.6, coords: [[140.85, 37.10], [140.95, 37.50], [141.00, 37.90]] }  // 双葉断層
+  { name: '西山断層帯', color: COLOR_Z_RANK, width: 1.6, coords: [[129.85, 32.75], [129.95, 32.95], [130.10, 33.20]] },
+  { name: '雲仙断層群', color: COLOR_Z_RANK, width: 1.6, coords: [[130.05, 32.72], [130.25, 32.75], [130.45, 32.70]] },
+  { name: '花折断層帯', color: COLOR_Z_RANK, width: 1.6, coords: [[135.78, 34.98], [135.83, 35.15], [135.90, 35.35]] },
+  { name: '双葉断層', color: COLOR_Z_RANK, width: 1.6, coords: [[140.85, 37.10], [140.95, 37.50], [141.00, 37.90]] }
 ];
 
 function createFaultRibbon(coords, widthDeg, color, surfaceOffset = 0.65) {
@@ -431,6 +431,39 @@ function createFaultRibbon(coords, widthDeg, color, surfaceOffset = 0.65) {
   return new THREE.Mesh(geo, mat);
 }
 
+function createFaultLabel(name, hexColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 280;
+  canvas.height = 60;
+  const ctx = canvas.getContext('2d');
+
+  const colorStr = typeof hexColor === 'number' ? '#' + hexColor.toString(16).padStart(6, '0') : hexColor;
+
+  ctx.font = 'Bold 24px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+  ctx.strokeStyle = colorStr;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(6, 6, canvas.width - 12, canvas.height - 12, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = colorStr;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⚡ ' + name, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(24, 5.1, 1);
+  return sprite;
+}
+
 function addFaults() {
   MAJOR_FAULTS.forEach(item => {
     // 活断層・構造線を帯（Ribbon Mesh）として立体描画
@@ -446,6 +479,33 @@ function addFaults() {
     const pts = interpolateLine(item.coords, 0.04, 0.70);
     const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
     faultGroup.add(new THREE.Line(lineGeo, lineMat));
+
+    // 鉛直高さ方向に線を伸ばして断層名を表示（火山情報と重ならないよう高さ22に配置）
+    if (item.name) {
+      const midIdx = Math.floor(pts.length / 2);
+      const groundPos = pts[midIdx] || pts[0];
+      if (groundPos) {
+        const normal = groundPos.clone().normalize();
+        const poleHeight = 22;
+        const topPos = groundPos.clone().add(normal.clone().multiplyScalar(poleHeight));
+
+        const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, topPos]);
+        const poleMat = new THREE.LineDashedMaterial({
+          color: item.color,
+          dashSize: 1,
+          gapSize: 0.5,
+          transparent: true,
+          opacity: 0.75
+        });
+        const poleLine = new THREE.Line(poleGeo, poleMat);
+        poleLine.computeLineDistances();
+        faultGroup.add(poleLine);
+
+        const label = createFaultLabel(item.name, item.color);
+        label.position.copy(topPos).add(normal.clone().multiplyScalar(2.5));
+        faultGroup.add(label);
+      }
+    }
   });
 }
 
