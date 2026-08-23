@@ -311,6 +311,29 @@ function buildCurvedGrid() {
 }
 buildCurvedGrid();
 
+// 海面指定高度 (offset) に沿って細分化補間するライン
+function interpolateSeaLevelLine(coords, maxStep = 0.05, offset = 45.0) {
+  const resultPts = [];
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(dist / maxStep));
+
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const lon = p1[0] + dx * t;
+      const lat = p1[1] + dy * t;
+      resultPts.push(geoToSeaLevel3D(lon, lat, offset));
+    }
+  }
+  const last = coords[coords.length - 1];
+  resultPts.push(geoToSeaLevel3D(last[0], last[1], offset));
+  return resultPts;
+}
+
 // 2点間(lon1, lat1) -> (lon2, lat2) を細分化して地形(3D標高)に綺麗に沿わせる
 function interpolateLine(coords, maxStep = 0.05, surfaceOffset = 0.6) {
   const resultPts = [];
@@ -337,6 +360,9 @@ function interpolateLine(coords, maxStep = 0.05, surfaceOffset = 0.6) {
 const mapGroup = new THREE.Group();
 worldGroup.add(mapGroup);
 
+const overlayMapGroup = new THREE.Group();
+worldGroup.add(overlayMapGroup);
+
 const faultGroup = new THREE.Group();
 worldGroup.add(faultGroup);
 
@@ -361,6 +387,22 @@ function addGeoJSON(obj) {
     side:THREE.DoubleSide
   });
 
+  const overlayFillMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.6,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.65,
+    side: THREE.DoubleSide
+  });
+  const overlayLineMat = new THREE.LineBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.8
+  });
+
+  const OVERLAY_ALTITUDE = 45.0; // 富士山(標高22)より上空に配置する平面日本地図の高度
+
   function polygon(coords) {
     const shape = new THREE.Shape();
     coords.forEach((p,i)=>{
@@ -368,6 +410,7 @@ function addGeoJSON(obj) {
     });
     shape.closePath();
 
+    // 1. 地形3Dマップ
     const geo = new THREE.ShapeGeometry(shape);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
@@ -385,6 +428,25 @@ function addGeoJSON(obj) {
     const linePts = interpolateLine(coords, 0.05, 0.35);
     const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
     mapGroup.add(new THREE.Line(lineGeo, mapLineMat));
+
+    // 2. 上空の平面日本地図 (富士山の上空 +45)
+    const overlayGeo = new THREE.ShapeGeometry(shape);
+    const overlayPos = overlayGeo.attributes.position;
+    for (let i = 0; i < overlayPos.count; i++) {
+      const lon = overlayPos.getX(i);
+      const lat = overlayPos.getY(i);
+      const p3d = geoToSeaLevel3D(lon, lat, OVERLAY_ALTITUDE);
+      overlayPos.setXYZ(i, p3d.x, p3d.y, p3d.z);
+    }
+    overlayGeo.computeVertexNormals();
+
+    const overlayMesh = new THREE.Mesh(overlayGeo, overlayFillMat);
+    overlayMapGroup.add(overlayMesh);
+
+    // 上空マップ境界線
+    const overlayLinePts = interpolateSeaLevelLine(coords, 0.05, OVERLAY_ALTITUDE + 0.2);
+    const overlayLineGeo = new THREE.BufferGeometry().setFromPoints(overlayLinePts);
+    overlayMapGroup.add(new THREE.Line(overlayLineGeo, overlayLineMat));
   }
 
   function geometry(g) {
@@ -708,18 +770,21 @@ function showQuakeIntensities(q) {
     }
   });
 
+  const OVERLAY_ALTITUDE = 45.0;
+
   prefMaxScale.forEach(({ scale }, prefName) => {
     const center = prefCenters.get(prefName);
     if (!center) return;
 
     const info = getIntensityInfo(scale);
     const groundPos = geoTo3D(center.lon, center.lat, 0, 0.8);
-    const normal = groundPos.clone().normalize();
-    const poleHeight = 10.0 + (scale / 70.0) * 12.0;
-    const topPos = groundPos.clone().add(normal.clone().multiplyScalar(poleHeight));
+    // 上空平面地図上の対応位置 (高度45km)
+    const overlayPos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE);
+    const normal = overlayPos.clone().normalize();
+    const badgePos = overlayPos.clone().add(normal.clone().multiplyScalar(2.5));
 
-    // 地表からの指示ポール（鉛直高さ方向線）
-    const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, topPos]);
+    // 地表から上空平面日本地図への指示ポール（鉛直高さ方向線）
+    const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, badgePos]);
     const poleMat = new THREE.LineDashedMaterial({
       color: info.hex,
       dashSize: 1,
@@ -731,9 +796,9 @@ function showQuakeIntensities(q) {
     poleLine.computeLineDistances();
     intensityGroup.add(poleLine);
 
-    // 震度四角バッジラベル
+    // 上空平面地図上に浮かぶ震度四角バッジラベル
     const label = createIntensityLabel(info.text, info.color);
-    label.position.copy(topPos).add(normal.clone().multiplyScalar(1.5));
+    label.position.copy(badgePos);
     intensityGroup.add(label);
   });
 }
