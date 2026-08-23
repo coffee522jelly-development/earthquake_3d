@@ -394,23 +394,31 @@ function addGeoJSON(obj) {
   obj.features.forEach(f=> {
     geometry(f.geometry);
 
-    // 都道府県ごとの代表（中心）座標の算出
-    let sumLon = 0, sumLat = 0, count = 0;
-    const processCoords = (coords) => {
-      coords.forEach(pt => {
-        if (typeof pt[0] === 'number') {
-          sumLon += pt[0];
-          sumLat += pt[1];
-          count++;
-        } else {
-          processCoords(pt);
+    // 都道府県本土（最も頂点数の多いポリゴン）の代表（中心）座標の算出
+    let mainPolygonCoords = null;
+    let maxLen = 0;
+    const findMain = (coords) => {
+      if (typeof coords[0][0] === 'number') {
+        if (coords.length > maxLen) {
+          maxLen = coords.length;
+          mainPolygonCoords = coords;
         }
-      });
+      } else {
+        coords.forEach(c => findMain(c));
+      }
     };
-    processCoords(f.geometry.coordinates);
-    if (count > 0 && f.properties && f.properties.nam_ja) {
-      // "東京都", "北海道", "青森県" ...
-      prefCenters.set(f.properties.nam_ja, { lon: sumLon / count, lat: sumLat / count });
+    findMain(f.geometry.coordinates);
+
+    if (mainPolygonCoords && f.properties && f.properties.nam_ja) {
+      let sumLon = 0, sumLat = 0;
+      mainPolygonCoords.forEach(pt => {
+        sumLon += pt[0];
+        sumLat += pt[1];
+      });
+      prefCenters.set(f.properties.nam_ja, {
+        lon: sumLon / mainPolygonCoords.length,
+        lat: sumLat / mainPolygonCoords.length
+      });
     }
   });
 }
@@ -632,35 +640,48 @@ const quakeMeshes = new Map();
 
 // 気象庁震度カラー & テキスト変換
 function getIntensityInfo(scale) {
-  // scale: 10 -> 震度1, 20 -> 震度2, 30 -> 震度3, 40 -> 震度4, 45 -> 5弱, 50 -> 5強, 55 -> 6弱, 60 -> 6強, 70 -> 震度7
-  if (scale >= 70) return { text: '震度7', color: '#a855f7', hex: 0xa855f7 };
-  if (scale >= 60) return { text: '震度6強', color: '#ef4444', hex: 0xef4444 };
-  if (scale >= 55) return { text: '震度6弱', color: '#f87171', hex: 0xf87171 };
-  if (scale >= 50) return { text: '震度5強', color: '#f97316', hex: 0xf97316 };
-  if (scale >= 45) return { text: '震度5弱', color: '#fb923c', hex: 0xfb923c };
-  if (scale >= 40) return { text: '震度4', color: '#eab308', hex: 0xeab308 };
-  if (scale >= 30) return { text: '震度3', color: '#84cc16', hex: 0x84cc16 };
-  if (scale >= 20) return { text: '震度2', color: '#22c55e', hex: 0x22c55e };
-  return { text: '震度1', color: '#38bdf8', hex: 0x38bdf8 };
+  // scale: 10 -> 1, 20 -> 2, 30 -> 3, 40 -> 4, 45 -> 5弱, 50 -> 5強, 55 -> 6弱, 60 -> 6強, 70 -> 7
+  if (scale >= 70) return { text: '7', color: '#a855f7', hex: 0xa855f7 };
+  if (scale >= 60) return { text: '6強', color: '#ef4444', hex: 0xef4444 };
+  if (scale >= 55) return { text: '6弱', color: '#f87171', hex: 0xf87171 };
+  if (scale >= 50) return { text: '5強', color: '#f97316', hex: 0xf97316 };
+  if (scale >= 45) return { text: '5弱', color: '#fb923c', hex: 0xfb923c };
+  if (scale >= 40) return { text: '4', color: '#eab308', hex: 0xeab308 };
+  if (scale >= 30) return { text: '3', color: '#84cc16', hex: 0x84cc16 };
+  if (scale >= 20) return { text: '2', color: '#22c55e', hex: 0x22c55e };
+  return { text: '1', color: '#0284c7', hex: 0x0284c7 };
 }
 
 function createIntensityLabel(scaleText, colorStr) {
   const canvas = document.createElement('canvas');
-  canvas.width = 160;
-  canvas.height = 48;
+  const size = 128;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  ctx.font = 'Bold 22px system-ui, -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  ctx.strokeStyle = 'rgba(5, 12, 18, 0.9)';
-  ctx.lineWidth = 5;
-  ctx.lineJoin = 'round';
-  ctx.strokeText(scaleText, canvas.width / 2, canvas.height / 2);
+  // 四角いカラーバッジ枠 (角丸)
+  const pad = 12;
+  const boxSize = size - pad * 2;
+  const radius = 18;
 
   ctx.fillStyle = colorStr;
-  ctx.fillText(scaleText, canvas.width / 2, canvas.height / 2);
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, boxSize, boxSize, radius);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  // 震度文字 (白太字)
+  ctx.font = 'Bold ' + (scaleText.length > 1 ? '52px' : '68px') + ' system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(scaleText, size / 2, size / 2 + (scaleText.length > 1 ? 2 : 4));
 
   const texture = new THREE.CanvasTexture(canvas);
   const spriteMat = new THREE.SpriteMaterial({
@@ -669,7 +690,7 @@ function createIntensityLabel(scaleText, colorStr) {
     depthTest: false
   });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.scale.set(16, 4.8, 1);
+  sprite.scale.set(12, 12, 1);
   return sprite;
 }
 
@@ -697,16 +718,20 @@ function showQuakeIntensities(q) {
     const poleHeight = 10.0 + (scale / 70.0) * 12.0;
     const topPos = groundPos.clone().add(normal.clone().multiplyScalar(poleHeight));
 
-    // 地表からの指示ポール（線）
+    // 地表からの指示ポール（鉛直高さ方向線）
     const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, topPos]);
-    const poleMat = new THREE.LineBasicMaterial({
+    const poleMat = new THREE.LineDashedMaterial({
       color: info.hex,
+      dashSize: 1,
+      gapSize: 0.5,
       transparent: true,
       opacity: 0.85
     });
-    intensityGroup.add(new THREE.Line(poleGeo, poleMat));
+    const poleLine = new THREE.Line(poleGeo, poleMat);
+    poleLine.computeLineDistances();
+    intensityGroup.add(poleLine);
 
-    // 震度ピンラベル
+    // 震度四角バッジラベル
     const label = createIntensityLabel(info.text, info.color);
     label.position.copy(topPos).add(normal.clone().multiplyScalar(1.5));
     intensityGroup.add(label);
