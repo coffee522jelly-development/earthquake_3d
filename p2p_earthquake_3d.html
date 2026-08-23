@@ -160,10 +160,6 @@ scene.add(dirLight);
 const worldGroup = new THREE.Group();
 scene.add(worldGroup);
 
-const grid = new THREE.GridHelper(900, 30, 0x30414c, 0x17242d);
-grid.rotation.x = 0;
-worldGroup.add(grid);
-
 // 日本の緯度経度をThree.jsのローカル座標へ。
 // 地球の曲率 (半径 R = 1800) を反映した球面座標変換。
 const LON0 = 137.0;
@@ -211,6 +207,22 @@ function getElevation(lon, lat) {
   return h;
 }
 
+function geoToSeaLevel3D(lon, lat, offset = 0) {
+  const r = R_EARTH + offset;
+  const dLon = (lon - LON0) * RAD;
+  const phi = lat * RAD;
+  const sinPhi = Math.sin(phi);
+  const cosPhi = Math.cos(phi);
+  const cosDLon = Math.cos(dLon);
+  const sinDLon = Math.sin(dLon);
+
+  const x = r * cosPhi * sinDLon;
+  const y = r * (sinPhi * sinLat0 + cosPhi * cosLat0 * cosDLon) - R_EARTH;
+  const z = -r * (sinPhi * cosLat0 - cosPhi * sinLat0 * cosDLon);
+
+  return new THREE.Vector3(x, y, z);
+}
+
 function geoTo3D(lon, lat, depth=0, surfaceOffset=0) {
   const elev = getElevation(lon, lat);
   const r = R_EARTH + (depth > 0 ? -depth * DEPTH_SCALE : (elev + surfaceOffset));
@@ -228,6 +240,57 @@ function geoTo3D(lon, lat, depth=0, surfaceOffset=0) {
 
   return new THREE.Vector3(x, y, z);
 }
+
+// 地球曲率に沿う海面標高0kmの球面経緯度グリッド (日本列島周辺)
+const curvedGridGroup = new THREE.Group();
+worldGroup.add(curvedGridGroup);
+
+let gridMajorMat, gridMinorMat;
+
+function buildCurvedGrid() {
+  curvedGridGroup.clear();
+
+  gridMajorMat = new THREE.LineBasicMaterial({
+    color: 0x30414c,
+    transparent: true,
+    opacity: 0.65
+  });
+
+  gridMinorMat = new THREE.LineBasicMaterial({
+    color: 0x17242d,
+    transparent: true,
+    opacity: 0.4
+  });
+
+  const minLon = 120, maxLon = 152;
+  const minLat = 20, maxLat = 50;
+  const stepDegree = 1;
+
+  // 緯線 (Parallels)
+  for (let lat = minLat; lat <= maxLat; lat += stepDegree) {
+    const isMajor = (lat % 5 === 0);
+    const pts = [];
+    for (let lon = minLon; lon <= maxLon; lon += 0.2) {
+      pts.push(geoToSeaLevel3D(lon, lat, 0.1));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geo, isMajor ? gridMajorMat : gridMinorMat);
+    curvedGridGroup.add(line);
+  }
+
+  // 経線 (Meridians)
+  for (let lon = minLon; lon <= maxLon; lon += stepDegree) {
+    const isMajor = (lon % 5 === 0);
+    const pts = [];
+    for (let lat = minLat; lat <= maxLat; lat += 0.2) {
+      pts.push(geoToSeaLevel3D(lon, lat, 0.1));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geo, isMajor ? gridMajorMat : gridMinorMat);
+    curvedGridGroup.add(line);
+  }
+}
+buildCurvedGrid();
 
 // 2点間(lon1, lat1) -> (lon2, lat2) を細分化して地形(3D標高)に綺麗に沿わせる
 function interpolateLine(coords, maxStep = 0.05, surfaceOffset = 0.6) {
@@ -1022,16 +1085,15 @@ function toggleTheme(){
 
   if(isLightMode){
     scene.background.set(0xf1f5f9);
-    grid.visible = false;
+    if(gridMajorMat) { gridMajorMat.color.set(0x94a3b8); gridMajorMat.opacity = 0.6; }
+    if(gridMinorMat) { gridMinorMat.color.set(0xcbd5e1); gridMinorMat.opacity = 0.4; }
     if(mapLineMat) mapLineMat.color.set(0x64748b);
     if(mapFillMat) mapFillMat.color.set(0xdbeade);
     if(faultLineMat) faultLineMat.color.set(0xd97706);
   } else {
     scene.background.set(0x071018);
-    grid.visible = true;
-    grid.material.color.set(0xffffff);
-    grid.material.transparent = false;
-    grid.material.opacity = 1.0;
+    if(gridMajorMat) { gridMajorMat.color.set(0x30414c); gridMajorMat.opacity = 0.65; }
+    if(gridMinorMat) { gridMinorMat.color.set(0x17242d); gridMinorMat.opacity = 0.4; }
     if(mapLineMat) mapLineMat.color.set(0x8fa9b8);
     if(mapFillMat) mapFillMat.color.set(0x152c38);
     if(faultLineMat) faultLineMat.color.set(0xef4444);
