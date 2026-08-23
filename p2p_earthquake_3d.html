@@ -1041,7 +1041,19 @@ function toggleTheme(){
 document.querySelector('#theme-toggle').addEventListener('click', toggleTheme);
 
 let isJshisLoaded = false;
-const JSHIS_SAMPLE_MESHES = ['54401047N', '53394526N', '53393596N', '53394621N'];
+// 主要都市部・平野部（東京・埼玉・千葉・大阪・名古屋・仙台・福岡等）のJ-SHIS 3次メッシュコード拡張
+const JSHIS_SAMPLE_MESHES = [
+  // 東京・埼玉・千葉（関東平野）
+  '53394526N', '53393596N', '53394621N', '54401047N', '53395506N', '53394586N', '53394720N',
+  // 大阪・兵庫（大阪平野）
+  '52350341N', '52350351N', '52350342N', '52350352N',
+  // 愛知（濃尾平野）
+  '52366781N', '52366791N', '52366782N',
+  // 宮城（仙台平野）
+  '57403672N', '57403682N',
+  // 福岡（筑紫平野）
+  '50303374N', '50303384N'
+];
 
 async function loadJshisSubsurfaceData() {
   if (isJshisLoaded) return;
@@ -1091,13 +1103,43 @@ async function loadJshisSubsurfaceData() {
           }
           geo.computeVertexNormals();
 
-          const mesh = new THREE.Mesh(geo, jshisMat);
+          // 深度に応じた発色（浅い: シアン -> 深い: 青・紫）
+          const color = getDepthColor(Math.min(300, depthKm * 20));
+          const customJshisMat = new THREE.MeshStandardMaterial({
+            color: color,
+            roughness: 0.3,
+            metalness: 0.2,
+            transparent: true,
+            opacity: 0.75,
+            side: THREE.DoubleSide
+          });
+
+          const mesh = new THREE.Mesh(geo, customJshisMat);
           jshisGroup.add(mesh);
 
           // メッシュ枠線
           const edgePts = coords.map(p => geoTo3D(p[0], p[1], depthKm));
           const edgeGeo = new THREE.BufferGeometry().setFromPoints(edgePts);
           jshisGroup.add(new THREE.Line(edgeGeo, jshisEdgeMat));
+
+          // 地表から地下基盤面への垂直ガイド線
+          if (coords.length > 0) {
+            const centerLon = coords.reduce((acc, c) => acc + c[0], 0) / coords.length;
+            const centerLat = coords.reduce((acc, c) => acc + c[1], 0) / coords.length;
+            const surfaceP = geoTo3D(centerLon, centerLat, 0);
+            const bedrockP = geoTo3D(centerLon, centerLat, depthKm);
+            const poleGeo = new THREE.BufferGeometry().setFromPoints([surfaceP, bedrockP]);
+            const poleMat = new THREE.LineDashedMaterial({
+              color: color,
+              dashSize: 0.5,
+              gapSize: 0.3,
+              transparent: true,
+              opacity: 0.6
+            });
+            const pole = new THREE.Line(poleGeo, poleMat);
+            pole.computeLineDistances();
+            jshisGroup.add(pole);
+          }
         }
       });
     } catch (e) {
