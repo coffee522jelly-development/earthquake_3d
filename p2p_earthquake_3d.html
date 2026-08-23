@@ -104,7 +104,8 @@ body.light-mode #help{color:#64748b}
     <div id="list"></div>
   </div>
   <div id="top-right">
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button id="overlay-toggle" class="theme-btn" style="background:#0284c7;border-color:#38bdf8;color:#fff">🗺️ 2階地図 (震度面)</button>
       <button id="volcano-toggle" class="theme-btn" style="background:#ea580c;border-color:#f97316;color:#fff">🌋 活火山</button>
       <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
       <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
@@ -185,6 +186,7 @@ const LON0 = 137.0;
 const LAT0 = 36.0;
 const R_EARTH = 1800.0;
 const DEPTH_SCALE = 3.0;
+const OVERLAY_ALTITUDE = 90.0; // 富士山(標高22)より上空に配置する平面日本地図の高度
 
 const RAD = Math.PI / 180.0;
 const sinLat0 = Math.sin(LAT0 * RAD);
@@ -400,8 +402,6 @@ function addGeoJSON(obj) {
     transparent: true,
     opacity: 0.8
   });
-
-  const OVERLAY_ALTITUDE = 45.0; // 富士山(標高22)より上空に配置する平面日本地図の高度
 
   function polygon(coords) {
     const shape = new THREE.Shape();
@@ -770,8 +770,6 @@ function showQuakeIntensities(q) {
     }
   });
 
-  const OVERLAY_ALTITUDE = 45.0;
-
   prefMaxScale.forEach(({ scale }, prefName) => {
     const center = prefCenters.get(prefName);
     if (!center) return;
@@ -916,6 +914,20 @@ function initVolcanoes() {
 }
 initVolcanoes();
 
+document.querySelector('#overlay-toggle').addEventListener('click', () => {
+  overlayMapGroup.visible = !overlayMapGroup.visible;
+  const btn = document.querySelector('#overlay-toggle');
+  if (overlayMapGroup.visible) {
+    btn.style.background = '#0284c7';
+    btn.style.borderColor = '#38bdf8';
+    btn.style.color = '#ffffff';
+  } else {
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }
+});
+
 document.querySelector('#volcano-toggle').addEventListener('click', () => {
   volcanoGroup.visible = !volcanoGroup.visible;
   const btn = document.querySelector('#volcano-toggle');
@@ -1050,6 +1062,48 @@ function updateShockwaves(dt) {
       sw.mesh.material.opacity = sw.opacity;
     }
   }
+}
+
+function focusOnQuake(q, mesh) {
+  if (!mesh) return;
+  const targetPos = mesh.position.clone();
+  controls.target.copy(targetPos);
+
+  // 地球中心 (0, -R_EARTH, 0) から 震源への鉛直上方向ベクトル
+  const centerOfEarth = new THREE.Vector3(0, -R_EARTH, 0);
+  const upNormal = targetPos.clone().sub(centerOfEarth).normalize();
+
+  // 観測点（震度バッジ）の最大広がり距離（バウンディング半径）の計算
+  let maxDist = 0;
+  if (q && Array.isArray(q.points) && q.points.length > 0) {
+    const prefMaxScale = new Map();
+    q.points.forEach(pt => {
+      if (!pt.pref || pt.scale == null || pt.scale < 10) return;
+      const current = prefMaxScale.get(pt.pref);
+      if (!current || pt.scale > current.scale) {
+        prefMaxScale.set(pt.pref, true);
+      }
+    });
+
+    prefMaxScale.forEach((_, prefName) => {
+      const center = prefCenters.get(prefName);
+      if (!center) return;
+      const overlayPos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE);
+      const d = overlayPos.distanceTo(targetPos);
+      if (d > maxDist) maxDist = d;
+    });
+  }
+
+  // 画角 (camera.fov) に震度分布が収まる高度距離を計算
+  const fovRad = (camera.fov * Math.PI / 180.0) / 2.0;
+  const requiredDist = maxDist > 0 ? (maxDist + 50.0) / Math.tan(fovRad) : 260.0;
+  const camDistance = Math.max(180.0, Math.min(750.0, requiredDist));
+
+  // 震源の鉛直上空から見下げるカメラ配置（Northを画面上に配置）
+  const camPos = targetPos.clone().add(upNormal.multiplyScalar(camDistance));
+  camera.position.copy(camPos);
+  camera.up.set(0, 0, -1);
+  controls.update();
 }
 
 function createQuakeLabel(magText, depthKm, color) {
@@ -1239,8 +1293,7 @@ function renderDashboard(){
       showQuakeIntensities(q);
       const entry=quakeMeshes.get(q.id);
       if(entry && entry.mesh){
-        controls.target.copy(entry.mesh.position);
-        camera.position.copy(entry.mesh.position).add(new THREE.Vector3(70,70,70));
+        focusOnQuake(q, entry.mesh);
       }
     };
     list.appendChild(row);
@@ -1506,6 +1559,7 @@ window.addEventListener('click', (event) => {
     const hitObj = intersects[0].object;
     if (hitObj.userData && hitObj.userData.q) {
       showQuakeIntensities(hitObj.userData.q);
+      focusOnQuake(hitObj.userData.q, hitObj);
     }
   }
 });
