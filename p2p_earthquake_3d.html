@@ -346,6 +346,9 @@ jshisGroup.visible = false;
 
 let mapLineMat, mapFillMat, faultLineMat;
 
+// 都道府県中心座標テーブル
+const prefCenters = new Map();
+
 // GeoJSONをThree.jsの線として描画
 function addGeoJSON(obj) {
   mapLineMat = new THREE.LineBasicMaterial({color:0x8fa9b8});
@@ -388,7 +391,28 @@ function addGeoJSON(obj) {
     if(g.type==='Polygon') g.coordinates.forEach(polygon);
     if(g.type==='MultiPolygon') g.coordinates.forEach(mp=>mp.forEach(polygon));
   }
-  obj.features.forEach(f=>geometry(f.geometry));
+  obj.features.forEach(f=> {
+    geometry(f.geometry);
+
+    // 都道府県ごとの代表（中心）座標の算出
+    let sumLon = 0, sumLat = 0, count = 0;
+    const processCoords = (coords) => {
+      coords.forEach(pt => {
+        if (typeof pt[0] === 'number') {
+          sumLon += pt[0];
+          sumLat += pt[1];
+          count++;
+        } else {
+          processCoords(pt);
+        }
+      });
+    };
+    processCoords(f.geometry.coordinates);
+    if (count > 0 && f.properties && f.properties.nam_ja) {
+      // "東京都", "北海道", "青森県" ...
+      prefCenters.set(f.properties.nam_ja, { lon: sumLon / count, lat: sumLat / count });
+    }
+  });
 }
 
 // 公開GeoJSON（都道府県境）
@@ -597,11 +621,97 @@ async function loadMap(){
   addFaults();
 }
 
-// 地震
+// 地震 & 震度表示
 const quakeGroup = new THREE.Group();
 worldGroup.add(quakeGroup);
 
+const intensityGroup = new THREE.Group();
+worldGroup.add(intensityGroup);
+
 const quakeMeshes = new Map();
+
+// 気象庁震度カラー & テキスト変換
+function getIntensityInfo(scale) {
+  // scale: 10 -> 震度1, 20 -> 震度2, 30 -> 震度3, 40 -> 震度4, 45 -> 5弱, 50 -> 5強, 55 -> 6弱, 60 -> 6強, 70 -> 震度7
+  if (scale >= 70) return { text: '震度7', color: '#a855f7', hex: 0xa855f7 };
+  if (scale >= 60) return { text: '震度6強', color: '#ef4444', hex: 0xef4444 };
+  if (scale >= 55) return { text: '震度6弱', color: '#f87171', hex: 0xf87171 };
+  if (scale >= 50) return { text: '震度5強', color: '#f97316', hex: 0xf97316 };
+  if (scale >= 45) return { text: '震度5弱', color: '#fb923c', hex: 0xfb923c };
+  if (scale >= 40) return { text: '震度4', color: '#eab308', hex: 0xeab308 };
+  if (scale >= 30) return { text: '震度3', color: '#84cc16', hex: 0x84cc16 };
+  if (scale >= 20) return { text: '震度2', color: '#22c55e', hex: 0x22c55e };
+  return { text: '震度1', color: '#38bdf8', hex: 0x38bdf8 };
+}
+
+function createIntensityLabel(scaleText, colorStr) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 48;
+  const ctx = canvas.getContext('2d');
+
+  ctx.font = 'Bold 22px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.strokeStyle = 'rgba(5, 12, 18, 0.9)';
+  ctx.lineWidth = 5;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(scaleText, canvas.width / 2, canvas.height / 2);
+
+  ctx.fillStyle = colorStr;
+  ctx.fillText(scaleText, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(16, 4.8, 1);
+  return sprite;
+}
+
+function showQuakeIntensities(q) {
+  intensityGroup.clear();
+  if (!q || !Array.isArray(q.points) || q.points.length === 0) return;
+
+  // 各都道府県（または観測地点）ごとの最大震度をまとめる
+  const prefMaxScale = new Map();
+  q.points.forEach(pt => {
+    if (!pt.pref || pt.scale == null || pt.scale < 10) return;
+    const current = prefMaxScale.get(pt.pref);
+    if (!current || pt.scale > current.scale) {
+      prefMaxScale.set(pt.pref, { scale: pt.scale, addr: pt.addr });
+    }
+  });
+
+  prefMaxScale.forEach(({ scale }, prefName) => {
+    const center = prefCenters.get(prefName);
+    if (!center) return;
+
+    const info = getIntensityInfo(scale);
+    const groundPos = geoTo3D(center.lon, center.lat, 0, 0.8);
+    const normal = groundPos.clone().normalize();
+    const poleHeight = 10.0 + (scale / 70.0) * 12.0;
+    const topPos = groundPos.clone().add(normal.clone().multiplyScalar(poleHeight));
+
+    // 地表からの指示ポール（線）
+    const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, topPos]);
+    const poleMat = new THREE.LineBasicMaterial({
+      color: info.hex,
+      transparent: true,
+      opacity: 0.85
+    });
+    intensityGroup.add(new THREE.Line(poleGeo, poleMat));
+
+    // 震度ピンラベル
+    const label = createIntensityLabel(info.text, info.color);
+    label.position.copy(topPos).add(normal.clone().multiplyScalar(1.5));
+    intensityGroup.add(label);
+  });
+}
 
 function getDepthColor(depth){
   const maxDepth = 300;
@@ -1036,6 +1146,7 @@ function renderDashboard(){
       if (hudEl.classList.contains('fullscreen')) {
         setHudFullscreen(false);
       }
+      showQuakeIntensities(q);
       const entry=quakeMeshes.get(q.id);
       if(entry && entry.mesh){
         controls.target.copy(entry.mesh.position);
@@ -1285,6 +1396,27 @@ document.querySelector('#jshis-toggle').addEventListener('click', async () => {
     btn.style.background = '';
     btn.style.borderColor = '';
     btn.style.color = '';
+  }
+});
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener('click', (event) => {
+  // HUDやUIエレメント上のクリックは無視
+  if (event.target.closest('#hud, #hud-expand, #timelapse-bar, #top-right, #VRButton')) return;
+
+  mouse.x = (event.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(quakeGroup.children);
+
+  if (intersects.length > 0) {
+    const hitObj = intersects[0].object;
+    if (hitObj.userData && hitObj.userData.q) {
+      showQuakeIntensities(hitObj.userData.q);
+    }
   }
 });
 
