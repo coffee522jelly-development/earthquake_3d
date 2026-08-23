@@ -1099,10 +1099,11 @@ function focusOnQuake(q, mesh) {
   const requiredDist = maxDist > 0 ? (maxDist + 50.0) / Math.tan(fovRad) : 260.0;
   const camDistance = Math.max(180.0, Math.min(750.0, requiredDist));
 
-  // 震源の鉛直上空から見下げるカメラ配置（Northを画面上に配置）
-  const camPos = targetPos.clone().add(upNormal.multiplyScalar(camDistance));
+  // 震源の上空付近から見下げるカメラ配置（標準の camera.up (0,1,0) とマウス操作方向を保持）
+  camera.up.set(0, 1, 0);
+  const offsetDir = upNormal.clone().add(new THREE.Vector3(0, 0, 0.25)).normalize();
+  const camPos = targetPos.clone().add(offsetDir.multiplyScalar(camDistance));
   camera.position.copy(camPos);
-  camera.up.set(0, 0, -1);
   controls.update();
 }
 
