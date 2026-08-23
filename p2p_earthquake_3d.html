@@ -11,7 +11,7 @@ canvas{display:block}
 #hud{position:absolute;left:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);min-width:340px;max-width:calc(100vw - 32px)}
 
 /* Timelapse control bar at bottom center */
-#timelapse-bar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(5,12,18,.88);border:1px solid #30404b;border-radius:12px;padding:10px 18px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:520px;max-width:calc(100vw - 40px)}
+#timelapse-bar{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(5,12,18,.88);border:1px solid #30404b;border-radius:12px;padding:10px 18px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:520px;max-width:calc(100vw - 40px)}
 #tl-play{background:#0284c7;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;transition:background .2s ease}
 #tl-play:hover{background:#0369a1}
 #tl-slider{flex:1;height:6px;accent-color:#38bdf8;cursor:pointer}
@@ -438,20 +438,19 @@ function createFaultLabel(name, hexColor) {
   const ctx = canvas.getContext('2d');
 
   const colorStr = typeof hexColor === 'number' ? '#' + hexColor.toString(16).padStart(6, '0') : hexColor;
+  const text = '⚡ ' + name;
 
   ctx.font = 'Bold 24px system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-  ctx.strokeStyle = colorStr;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(6, 6, canvas.width - 12, canvas.height - 12, 8);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = colorStr;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('⚡ ' + name, canvas.width / 2, canvas.height / 2);
+
+  ctx.strokeStyle = 'rgba(5, 12, 18, 0.9)';
+  ctx.lineWidth = 5;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+  ctx.fillStyle = colorStr;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
   const texture = new THREE.CanvasTexture(canvas);
   const spriteMat = new THREE.SpriteMaterial({
