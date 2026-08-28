@@ -1258,6 +1258,23 @@ function getMagnitudeBadgeClass(q){
   return 'badge-red';
 }
 
+function getTsunamiText(tsunami) {
+  switch (tsunami) {
+    case 'None': return '津波の心配なし';
+    case 'Checking': return '津波調査中';
+    case 'NonEffective': return '若干の海面変動あり';
+    case 'Watch': return '⚠️ 津波注意報';
+    case 'Warning': return '🚨 津波警報';
+    default: return '津波情報なし';
+  }
+}
+
+function getIntensityBadgeHtml(scale) {
+  if (scale == null || scale < 10) return '';
+  const info = getIntensityInfo(scale);
+  return `<span class="badge" style="border-color:${info.color};color:${info.color};background:${info.color}22">震度${info.text}</span>`;
+}
+
 function renderDashboard(){
   initTimelapseTimeline();
   applyTimelapseVisibility();
@@ -1270,8 +1287,13 @@ function renderDashboard(){
   if(latest){
     const h=latest.earthquake.hypocenter;
     const d=h.depth>=0 ? `${h.depth} km` : '不明';
+    const maxScaleInfo = latest.earthquake.maxScale != null && latest.earthquake.maxScale >= 10 ? ` 震度${getIntensityInfo(latest.earthquake.maxScale).text}` : '';
+    const tsunamiStr = getTsunamiText(latest.earthquake.domesticTsunami);
+    const pointCount = Array.isArray(latest.points) ? latest.points.length : 0;
     document.querySelector('#latest').innerHTML=
-      `<b>最新：${h.name||'震源不明'}</b><br>${magnitude(latest)} / 深さ ${d} / ${formatTime(latest)}`;
+      `<b>最新：${h.name||'震源不明'}</b> (${magnitude(latest)}${maxScaleInfo})<br>` +
+      `深さ: ${d} / 発生: ${formatTime(latest)}<br>` +
+      `<span style="color:#94a3b8;font-size:11px">津波: ${tsunamiStr} / 観測点数: ${pointCount}ヶ所</span>`;
   }else{
     document.querySelector('#latest').textContent='該当する地震はありません';
   }
@@ -1283,9 +1305,15 @@ function renderDashboard(){
     const row=document.createElement('div');
     row.className='quake-row';
     const badgeClass=getMagnitudeBadgeClass(q);
+    const intensityBadge = getIntensityBadgeHtml(q.earthquake?.maxScale);
+    const tsunamiStr = getTsunamiText(q.earthquake?.domesticTsunami);
+    const pointCount = Array.isArray(q.points) ? q.points.length : 0;
+    const maxScaleText = q.earthquake?.maxScale != null && q.earthquake.maxScale >= 10 ? `最大震度 ${getIntensityInfo(q.earthquake.maxScale).text}` : '最大震度不明';
+
     row.innerHTML=
-      `<div class="quake-title"><span class="badge ${badgeClass}">${magnitude(q)}</span>${h.name||'震源不明'}</div>`+
-      `<div class="quake-meta">${formatTime(q)}　深さ ${h.depth} km　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
+      `<div class="quake-title"><span class="badge ${badgeClass}">${magnitude(q)}</span>${intensityBadge}${h.name||'震源不明'}</div>`+
+      `<div class="quake-meta">${formatTime(q)}　${maxScaleText}　深さ ${h.depth} km</div>`+
+      `<div class="quake-meta" style="font-size:10px;opacity:0.85">津波: ${tsunamiStr}　観測 ${pointCount}地点　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
     row.onclick=()=>{
       // 全画面モード中に地震を選択した場合、3Dビューワーが見えるよう通常表示に戻す
       if (hudEl.classList.contains('fullscreen')) {
