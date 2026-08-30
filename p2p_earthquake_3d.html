@@ -51,9 +51,14 @@ body.light-mode #list::-webkit-scrollbar-thumb:hover{background:#94a3b8}
 .badge-blue{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,0.12)}
 .badge-yellow{border-color:#facc15;color:#facc15;background:rgba(250,204,21,0.12)}
 .badge-red{border-color:#f87171;color:#f87171;background:rgba(248,113,113,0.12)}
-#top-right{position:absolute;right:16px;top:16px;z-index:5;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+#top-right{position:absolute;right:16px;top:16px;z-index:15;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+#menu-toggle{display:none}
+#menu-content{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.menu-buttons{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .theme-btn{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;color:#e8f0f5;padding:8px 12px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s ease}
 .theme-btn:hover{background:#12202a}
+.theme-btn.active-blue{background:#0284c7 !important;border-color:#38bdf8 !important;color:#ffffff !important}
+.theme-btn.active-orange{background:#ea580c !important;border-color:#f97316 !important;color:#ffffff !important}
 #legend{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px;backdrop-filter:blur(8px)}
 #help{position:absolute;left:16px;bottom:16px;z-index:5;color:#91a4b0;font-size:12px}
 
@@ -77,6 +82,7 @@ body.light-mode .quake-meta{color:#64748b}
 body.light-mode .badge{border-color:#94a3b8;color:#0369a1}
 body.light-mode .theme-btn{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833}
 body.light-mode .theme-btn:hover{background:#e2e8f0}
+body.light-mode #menu-content.mobile-drawer{background:rgba(255,255,255,.95);border-color:#cfd8dc;box-shadow:0 8px 24px rgba(0,0,0,.12)}
 body.light-mode #legend{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 body.light-mode #help{color:#64748b}
 
@@ -123,16 +129,54 @@ body.light-mode #help{color:#64748b}
     max-width: calc(100vw - 16px);
   }
 
+  #menu-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  #menu-content {
+    display: none;
+    background: rgba(5,12,18,.95);
+    border: 1px solid #30404b;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    width: 240px;
+    max-width: calc(100vw - 24px);
+  }
+
+  #menu-content.open {
+    display: flex;
+  }
+
+  .menu-buttons {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 6px;
+  }
+
   .theme-btn {
-    padding: 5px 8px;
+    padding: 7px 10px;
     font-size: 11px;
-    border-radius: 6px;
+    border-radius: 8px;
+    width: 100%;
+    text-align: left;
+    box-sizing: border-box;
   }
 
   #legend {
     padding: 6px 8px;
     font-size: 10px;
-    max-width: 220px;
+    width: 100%;
+    box-sizing: border-box;
+    display: block !important;
   }
 
   #timelapse-bar {
@@ -218,26 +262,29 @@ body.light-mode #help{color:#64748b}
     <div id="list"></div>
   </div>
   <div id="top-right">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-      <button id="overlay-toggle" class="theme-btn" style="background:#0284c7;border-color:#38bdf8;color:#fff">🗺️ 2階地図 (震度面)</button>
-      <button id="volcano-toggle" class="theme-btn" style="background:#ea580c;border-color:#f97316;color:#fff">🌋 活火山</button>
-      <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
-      <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
-    </div>
-    <div id="legend">
-      <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
-      <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
-      <div style="font-size:11px;line-height:1.4">
-        <span style="color:#ef4444">━</span> Sランク (≥3%: 警固,糸静,布田川等)<br>
-        <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
-        <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
-        <span style="color:#ec4899">━</span> プレート境界・海溝系
+    <button id="menu-toggle" class="theme-btn">⚙️ メニュー</button>
+    <div id="menu-content">
+      <div class="menu-buttons">
+        <button id="overlay-toggle" class="theme-btn active-blue">🗺️ 2階地図 (震度面)</button>
+        <button id="volcano-toggle" class="theme-btn active-orange">🌋 活火山</button>
+        <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
+        <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
       </div>
-      <div style="margin-top:4px;font-size:11px;color:#38bdf8">
-        ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
-      </div>
-      <div style="margin-top:4px;font-size:11px;color:#f97316">
-        ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
+      <div id="legend">
+        <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
+        <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
+        <div style="font-size:11px;line-height:1.4">
+          <span style="color:#ef4444">━</span> Sランク (≥3%: 警固,糸静,布田川等)<br>
+          <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
+          <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
+          <span style="color:#ec4899">━</span> プレート境界・海溝系
+        </div>
+        <div style="margin-top:4px;font-size:11px;color:#38bdf8">
+          ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
+        </div>
+        <div style="margin-top:4px;font-size:11px;color:#f97316">
+          ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
+        </div>
       </div>
     </div>
   </div>
@@ -300,7 +347,7 @@ const LON0 = 137.0;
 const LAT0 = 36.0;
 const R_EARTH = 1800.0;
 const DEPTH_SCALE = 3.0;
-const OVERLAY_ALTITUDE = 90.0; // 富士山(標高22)より上空に配置する平面日本地図の高度
+const OVERLAY_ALTITUDE = 30.0; // 地表(最高標高22)により近づけた2階震度面日本地図の高度
 
 const RAD = Math.PI / 180.0;
 const sinLat0 = Math.sin(LAT0 * RAD);
@@ -1028,32 +1075,27 @@ function initVolcanoes() {
 }
 initVolcanoes();
 
+// スマホ用操作メニュー開閉トグル
+const menuToggleBtn = document.querySelector('#menu-toggle');
+const menuContent = document.querySelector('#menu-content');
+
+if (menuToggleBtn && menuContent) {
+  menuToggleBtn.addEventListener('click', () => {
+    menuContent.classList.toggle('open');
+    menuToggleBtn.classList.toggle('active-blue', menuContent.classList.contains('open'));
+  });
+}
+
 document.querySelector('#overlay-toggle').addEventListener('click', () => {
   overlayMapGroup.visible = !overlayMapGroup.visible;
   const btn = document.querySelector('#overlay-toggle');
-  if (overlayMapGroup.visible) {
-    btn.style.background = '#0284c7';
-    btn.style.borderColor = '#38bdf8';
-    btn.style.color = '#ffffff';
-  } else {
-    btn.style.background = '';
-    btn.style.borderColor = '';
-    btn.style.color = '';
-  }
+  btn.classList.toggle('active-blue', overlayMapGroup.visible);
 });
 
 document.querySelector('#volcano-toggle').addEventListener('click', () => {
   volcanoGroup.visible = !volcanoGroup.visible;
   const btn = document.querySelector('#volcano-toggle');
-  if (volcanoGroup.visible) {
-    btn.style.background = '#ea580c';
-    btn.style.borderColor = '#f97316';
-    btn.style.color = '#ffffff';
-  } else {
-    btn.style.background = '';
-    btn.style.borderColor = '';
-    btn.style.color = '';
-  }
+  btn.classList.toggle('active-orange', volcanoGroup.visible);
 });
 
 const depthRulerGroup = new THREE.Group();
@@ -1673,15 +1715,9 @@ async function loadJshisSubsurfaceData() {
 document.querySelector('#jshis-toggle').addEventListener('click', async () => {
   jshisGroup.visible = !jshisGroup.visible;
   const btn = document.querySelector('#jshis-toggle');
+  btn.classList.toggle('active-blue', jshisGroup.visible);
   if (jshisGroup.visible) {
-    btn.style.background = '#0284c7';
-    btn.style.borderColor = '#38bdf8';
-    btn.style.color = '#ffffff';
     await loadJshisSubsurfaceData();
-  } else {
-    btn.style.background = '';
-    btn.style.borderColor = '';
-    btn.style.color = '';
   }
 });
 
