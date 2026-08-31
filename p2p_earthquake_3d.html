@@ -8,14 +8,28 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;color:#e8f0f5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 #app{width:100%;height:100%;position:relative}
 canvas{display:block}
-#hud{position:absolute;left:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);min-width:340px;max-width:calc(100vw - 32px);transition:transform .3s cubic-bezier(0.4, 0, 0.2, 1), opacity .3s ease, right .3s ease, bottom .3s ease}
-#hud.collapsed{transform:translateX(calc(-100% - 30px));opacity:0;pointer-events:none}
-#hud.fullscreen{right:16px;bottom:16px;max-width:none;z-index:20;display:flex;flex-direction:column;background:rgba(5,12,18,.95)}
-#hud.fullscreen #list{max-height:none;flex:1}
-.hud-collapse-btn{background:rgba(255,255,255,.08);border:1px solid #3a4d59;color:#9fb2be;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;transition:all .2s ease}
-.hud-collapse-btn:hover{background:rgba(255,255,255,.18);color:#fff}
-#hud-expand{position:absolute;left:16px;top:16px;z-index:6;background:rgba(5,12,18,.88);border:1px solid #30404b;border-radius:10px;color:#38bdf8;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;align-items:center;gap:6px;transition:all .2s ease}
-#hud-expand:hover{background:#12202a;border-color:#38bdf8}
+/* Big Unified Operation & Earthquake Menu */
+#top-right{position:absolute;right:16px;top:16px;z-index:15;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+#menu-toggle{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+#menu-content{display:none;background:rgba(5,12,18,.92);border:1px solid #30404b;border-radius:12px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.4);backdrop-filter:blur(10px);gap:16px;max-width:calc(100vw - 32px);max-height:calc(100vh - 120px);overflow-y:auto;box-sizing:border-box}
+#menu-content.open{display:flex;flex-direction:row}
+
+.menu-section{display:flex;flex-direction:column;gap:10px}
+.menu-section-title{font-size:13px;font-weight:700;color:#38bdf8;margin:0 0 4px;padding-bottom:4px;border-bottom:1px solid #30404b;display:flex;align-items:center;justify-content:space-between}
+
+#hud-section{min-width:320px;max-width:380px}
+#hud-section.fullscreen{position:fixed;top:16px;left:16px;right:16px;bottom:16px;max-width:none;z-index:30;background:rgba(5,12,18,.96);padding:16px;border-radius:12px;border:1px solid #30404b;display:flex;flex-direction:column}
+#hud-section.fullscreen #list{max-height:none;flex:1}
+
+#operation-section{min-width:240px;max-width:300px}
+
+.menu-buttons{display:flex;flex-direction:column;gap:8px}
+.theme-btn{background:rgba(255,255,255,.05);border:1px solid #30404b;border-radius:10px;color:#e8f0f5;padding:8px 12px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s ease;text-align:left}
+.theme-btn:hover{background:#12202a}
+.theme-btn.active-blue{background:#0284c7 !important;border-color:#38bdf8 !important;color:#ffffff !important}
+.theme-btn.active-orange{background:#ea580c !important;border-color:#f97316 !important;color:#ffffff !important}
+#legend{background:rgba(255,255,255,.03);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px;backdrop-filter:blur(8px)}
+#help{position:absolute;left:16px;bottom:16px;z-index:5;color:#91a4b0;font-size:12px}
 
 /* Timelapse control bar at bottom center */
 #timelapse-bar{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(5,12,18,.88);border:1px solid #30404b;border-radius:12px;padding:10px 18px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:520px;max-width:calc(100vw - 40px)}
@@ -28,7 +42,7 @@ canvas{display:block}
 body.light-mode #timelapse-bar{background:rgba(255,255,255,.92);border-color:#cfd8dc;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 body.light-mode #tl-speed{background:#e2e8f0;border-color:#cbd5e1;color:#1c2833}
 body.light-mode #tl-date{color:#0284c7}
-h1{font-size:16px;margin:0 0 8px}
+h1{font-size:15px;margin:0}
 #status{font-size:12px;color:#9fb2be;margin-bottom:8px}
 #latest{font-size:13px;line-height:1.55}
 #summary{font-size:12px;color:#b9cbd4;margin:8px 0}
@@ -36,7 +50,7 @@ h1{font-size:16px;margin:0 0 8px}
 .tab{border:1px solid #3a4d59;background:#12202a;color:#b8c8d1;border-radius:6px;padding:6px 5px;cursor:pointer;font-size:12px}
 .tab:hover{background:#1a2d38}
 .tab.active{background:#29404d;color:#fff;border-color:#617987}
-#list{margin-top:10px;max-height:290px;overflow-y:auto;border-top:1px solid #263842}
+#list{margin-top:10px;max-height:260px;overflow-y:auto;border-top:1px solid #263842}
 #list::-webkit-scrollbar{width:5px}
 #list::-webkit-scrollbar-track{background:transparent}
 #list::-webkit-scrollbar-thumb{background:#3a4d59;border-radius:10px}
@@ -51,25 +65,15 @@ body.light-mode #list::-webkit-scrollbar-thumb:hover{background:#94a3b8}
 .badge-blue{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,0.12)}
 .badge-yellow{border-color:#facc15;color:#facc15;background:rgba(250,204,21,0.12)}
 .badge-red{border-color:#f87171;color:#f87171;background:rgba(248,113,113,0.12)}
-#top-right{position:absolute;right:16px;top:16px;z-index:15;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-#menu-toggle{display:none}
-#menu-content{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-.menu-buttons{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.theme-btn{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;color:#e8f0f5;padding:8px 12px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s ease}
-.theme-btn:hover{background:#12202a}
-.theme-btn.active-blue{background:#0284c7 !important;border-color:#38bdf8 !important;color:#ffffff !important}
-.theme-btn.active-orange{background:#ea580c !important;border-color:#f97316 !important;color:#ffffff !important}
-#legend{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px;backdrop-filter:blur(8px)}
-#help{position:absolute;left:16px;bottom:16px;z-index:5;color:#91a4b0;font-size:12px}
+.hud-collapse-btn{background:rgba(255,255,255,.08);border:1px solid #3a4d59;color:#9fb2be;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;transition:all .2s ease}
+.hud-collapse-btn:hover{background:rgba(255,255,255,.18);color:#fff}
 
 /* Light mode styles */
 body.light-mode{background:#f0f4f8;color:#1c2833}
-body.light-mode #hud{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 12px rgba(0,0,0,.08)}
-body.light-mode #hud.fullscreen{background:rgba(255,255,255,.96);box-shadow:0 8px 32px rgba(0,0,0,.15)}
+body.light-mode #menu-content{background:rgba(255,255,255,.94);border-color:#cfd8dc;color:#1c2833;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+body.light-mode #hud-section.fullscreen{background:rgba(255,255,255,.98);border-color:#cfd8dc}
 body.light-mode .hud-collapse-btn{background:#e2e8f0;border-color:#cbd5e1;color:#475569}
 body.light-mode .hud-collapse-btn:hover{background:#cbd5e1;color:#0f172a}
-body.light-mode #hud-expand{background:rgba(255,255,255,.92);border-color:#cfd8dc;color:#0284c7;box-shadow:0 4px 12px rgba(0,0,0,.1)}
-body.light-mode #hud-expand:hover{background:#f1f5f9}
 body.light-mode #status{color:#546e7a}
 body.light-mode #summary{color:#37474f}
 body.light-mode .tab{background:#e2e8f0;border-color:#cbd5e1;color:#334155}
@@ -80,35 +84,38 @@ body.light-mode .quake-row{border-bottom-color:#e2e8f0}
 body.light-mode .quake-row:hover{background:rgba(0,0,0,.04)}
 body.light-mode .quake-meta{color:#64748b}
 body.light-mode .badge{border-color:#94a3b8;color:#0369a1}
-body.light-mode .theme-btn{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833}
+body.light-mode .theme-btn{background:rgba(0,0,0,.04);border-color:#cfd8dc;color:#1c2833}
 body.light-mode .theme-btn:hover{background:#e2e8f0}
-body.light-mode #menu-content.mobile-drawer{background:rgba(255,255,255,.95);border-color:#cfd8dc;box-shadow:0 8px 24px rgba(0,0,0,.12)}
-body.light-mode #legend{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+body.light-mode #legend{background:rgba(0,0,0,.02);border-color:#cfd8dc;color:#1c2833}
 body.light-mode #help{color:#64748b}
 
 /* Smartphone / Mobile optimization */
 @media (max-width: 768px) {
-  #hud {
-    left: 8px;
+  #top-right {
+    right: 8px;
     top: 8px;
-    z-index: 15;
-    padding: 10px 12px;
-    min-width: 0;
     max-width: calc(100vw - 16px);
-    width: calc(100vw - 16px);
-    box-sizing: border-box;
   }
 
-  #hud h1 {
-    font-size: 14px;
+  #menu-content.open {
+    flex-direction: column;
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 100px);
+    padding: 12px;
   }
 
-  #hud-expand {
-    display: none !important; /* スマホではメニュー内に内包するため独立ボタンは非表示 */
+  #hud-section {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #operation-section {
+    min-width: 0;
+    max-width: 100%;
   }
 
   #list {
-    max-height: 32vh;
+    max-height: 25vh;
   }
 
   .tabs {
@@ -118,62 +125,6 @@ body.light-mode #help{color:#64748b}
   .tab {
     padding: 5px 2px;
     font-size: 11px;
-  }
-
-  #top-right {
-    right: 8px;
-    top: 8px;
-    max-width: calc(100vw - 16px);
-  }
-
-  #menu-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  }
-
-  #menu-content {
-    display: none;
-    background: rgba(5,12,18,.95);
-    border: 1px solid #30404b;
-    border-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    backdrop-filter: blur(10px);
-    width: 240px;
-    max-width: calc(100vw - 24px);
-  }
-
-  #menu-content.open {
-    display: flex;
-  }
-
-  .menu-buttons {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    gap: 6px;
-  }
-
-  .theme-btn {
-    padding: 7px 10px;
-    font-size: 11px;
-    border-radius: 8px;
-    width: 100%;
-    text-align: left;
-    box-sizing: border-box;
-  }
-
-  #legend {
-    padding: 6px 8px;
-    font-size: 10px;
-    width: 100%;
-    box-sizing: border-box;
-    display: block !important;
   }
 
   #timelapse-bar {
@@ -219,7 +170,7 @@ body.light-mode #help{color:#64748b}
 
 @media (max-width: 480px) {
   #list {
-    max-height: 25vh;
+    max-height: 22vh;
   }
 
   .quake-title {
@@ -229,59 +180,56 @@ body.light-mode #help{color:#64748b}
   .quake-meta {
     font-size: 10px;
   }
-
-  #legend {
-    display: none; /* Hide detailed legend on extremely small screens to preserve 3D view area */
-  }
 }
 </style>
 </head>
 <body>
 <div id="app">
-  <button id="hud-expand" class="hud-expand-btn">📊 地震情報</button>
-  <div id="hud">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h1 style="margin:0">日本の地震 — 3D Viewer</h1>
-      <div style="display:flex;gap:6px">
-        <button id="hud-fullscreen" class="hud-collapse-btn" title="全画面で表示">⛶ 全画面</button>
-        <button id="hud-toggle" class="hud-collapse-btn" title="パネルを折りたたむ">◀ 閉じる</button>
-      </div>
-    </div>
-    <div id="status">地震情報を取得しています…</div>
-    <div class="tabs">
-      <button class="tab active" data-view="today">今日</button>
-      <button class="tab" data-view="week">週</button>
-      <button class="tab" data-view="month">月</button>
-      <button class="tab" data-view="recent">直近</button>
-    </div>
-    <div id="summary"></div>
-    <div id="latest">---</div>
-    <div id="list"></div>
-  </div>
   <div id="top-right">
-    <button id="menu-toggle" class="theme-btn">⚙️ メニュー</button>
-    <div id="menu-content">
-      <div class="menu-buttons">
-        <button id="hud-menu-toggle" class="theme-btn active-blue">📊 地震情報パネル</button>
-        <button id="overlay-toggle" class="theme-btn active-blue">🗺️ 2階地図 (震度面)</button>
-        <button id="volcano-toggle" class="theme-btn active-orange">🌋 活火山</button>
-        <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
-        <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
+    <button id="menu-toggle" class="theme-btn active-blue">⚙️ メニュー</button>
+    <div id="menu-content" class="open">
+      <!-- 大きなメニューの中の地震情報パネル -->
+      <div id="hud-section" class="menu-section">
+        <div class="menu-section-title">
+          <span>📊 地震情報パネル</span>
+          <button id="hud-fullscreen" class="hud-collapse-btn" title="全画面で表示">⛶ 全画面</button>
+        </div>
+        <div id="status">地震情報を取得しています…</div>
+        <div class="tabs">
+          <button class="tab active" data-view="today">今日</button>
+          <button class="tab" data-view="week">週</button>
+          <button class="tab" data-view="month">月</button>
+          <button class="tab" data-view="recent">直近</button>
+        </div>
+        <div id="summary"></div>
+        <div id="latest">---</div>
+        <div id="list"></div>
       </div>
-      <div id="legend">
-        <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
-        <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
-        <div style="font-size:11px;line-height:1.4">
-          <span style="color:#ef4444">━</span> Sランク (≥3%: 警固,糸静,布田川等)<br>
-          <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
-          <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
-          <span style="color:#ec4899">━</span> プレート境界・海溝系
+
+      <!-- 大きなメニューの中の右側操作パネル -->
+      <div id="operation-section" class="menu-section">
+        <div class="menu-section-title">⚙️ レイヤー・操作</div>
+        <div class="menu-buttons">
+          <button id="overlay-toggle" class="theme-btn active-blue">🗺️ 2階地図 (震度面)</button>
+          <button id="volcano-toggle" class="theme-btn active-orange">🌋 活火山</button>
+          <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
+          <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
         </div>
-        <div style="margin-top:4px;font-size:11px;color:#38bdf8">
-          ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
-        </div>
-        <div style="margin-top:4px;font-size:11px;color:#f97316">
-          ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
+        <div id="legend">
+          <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
+          <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
+          <div style="font-size:11px;line-height:1.4">
+            <span style="color:#ef4444">━</span> Sランク (≥3%: 警固,糸静,布田川等)<br>
+            <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
+            <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
+            <span style="color:#ec4899">━</span> プレート境界・海溝系
+          </div>
+          <div style="margin-top:4px;font-size:11px;color:#38bdf8">
+            ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
+          </div>
+          <div style="margin-top:4px;font-size:11px;color:#f97316">
+            ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
+          </div>
         </div>
       </div>
     </div>
@@ -1470,7 +1418,7 @@ function renderDashboard(){
       `<div class="quake-meta" style="font-size:10px;opacity:0.85">津波: ${tsunamiStr}　観測 ${pointCount}地点　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
     row.onclick=()=>{
       // 全画面モード中に地震を選択した場合、3Dビューワーが見えるよう通常表示に戻す
-      if (hudEl.classList.contains('fullscreen')) {
+      if (hudSectionEl && hudSectionEl.classList.contains('fullscreen')) {
         setHudFullscreen(false);
       }
       showQuakeIntensities(q);
@@ -1491,52 +1439,28 @@ function setView(view){
 
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
 
-// HUDパネルの折りたたみ・展開 & 全画面表示機能
-const hudEl = document.querySelector('#hud');
-const hudToggleBtn = document.querySelector('#hud-toggle');
-const hudExpandBtn = document.querySelector('#hud-expand');
+// HUDパネルの全画面表示機能
+const hudSectionEl = document.querySelector('#hud-section');
 const hudFullscreenBtn = document.querySelector('#hud-fullscreen');
-const hudMenuToggleBtn = document.querySelector('#hud-menu-toggle');
-
-function setHudCollapsed(collapsed) {
-  if (collapsed) {
-    hudEl.classList.remove('fullscreen');
-    hudFullscreenBtn.textContent = '⛶ 全画面';
-    hudEl.classList.add('collapsed');
-    hudExpandBtn.style.display = 'flex';
-    if (hudMenuToggleBtn) hudMenuToggleBtn.classList.remove('active-blue');
-  } else {
-    hudEl.classList.remove('collapsed');
-    hudExpandBtn.style.display = 'none';
-    if (hudMenuToggleBtn) hudMenuToggleBtn.classList.add('active-blue');
-  }
-}
-
-if (hudMenuToggleBtn) {
-  hudMenuToggleBtn.addEventListener('click', () => {
-    const isCollapsed = hudEl.classList.contains('collapsed');
-    setHudCollapsed(!isCollapsed);
-  });
-}
 
 function setHudFullscreen(fullscreen) {
-  if (fullscreen) {
-    hudEl.classList.remove('collapsed');
-    hudExpandBtn.style.display = 'none';
-    hudEl.classList.add('fullscreen');
-    hudFullscreenBtn.textContent = '🗗 通常表示';
-  } else {
-    hudEl.classList.remove('fullscreen');
-    hudFullscreenBtn.textContent = '⛶ 全画面';
+  if (hudSectionEl) {
+    if (fullscreen) {
+      hudSectionEl.classList.add('fullscreen');
+      hudFullscreenBtn.textContent = '🗗 通常表示';
+    } else {
+      hudSectionEl.classList.remove('fullscreen');
+      hudFullscreenBtn.textContent = '⛶ 全画面';
+    }
   }
 }
 
-hudToggleBtn.addEventListener('click', () => setHudCollapsed(true));
-hudExpandBtn.addEventListener('click', () => setHudCollapsed(false));
-hudFullscreenBtn.addEventListener('click', () => {
-  const isFS = hudEl.classList.contains('fullscreen');
-  setHudFullscreen(!isFS);
-});
+if (hudFullscreenBtn) {
+  hudFullscreenBtn.addEventListener('click', () => {
+    const isFS = hudSectionEl && hudSectionEl.classList.contains('fullscreen');
+    setHudFullscreen(!isFS);
+  });
+}
 
 async function loadHistory(){
   let allData = [];
@@ -1734,7 +1658,7 @@ const mouse = new THREE.Vector2();
 
 window.addEventListener('click', (event) => {
   // HUDやUIエレメント上のクリックは無視
-  if (event.target.closest('#hud, #hud-expand, #timelapse-bar, #top-right, #VRButton')) return;
+  if (event.target.closest('#timelapse-bar, #top-right, #VRButton')) return;
 
   mouse.x = (event.clientX / innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / innerHeight) * 2 + 1;
