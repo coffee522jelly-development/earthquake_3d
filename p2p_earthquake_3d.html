@@ -5,87 +5,89 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>P2P地震情報 3D Earthquake Viewer</title>
 <style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;color:#e8f0f5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+/* CAD / GIS Engineering Flat Technical Theme */
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090e15;color:#c5d2dc;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;letter-spacing:-0.01em}
 #app{width:100%;height:100%;position:relative}
 canvas{display:block}
-/* Left-aligned UI for PC & Mobile */
-#top-left{position:absolute;left:16px;top:16px;z-index:20;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
-#menu-toggle{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
 
-#hud-section{position:absolute;left:16px;top:60px;z-index:15;background:rgba(5,12,18,.85);border:1px solid #30404b;border-radius:12px;padding:14px;backdrop-filter:blur(10px);min-width:340px;max-width:380px;box-shadow:0 8px 24px rgba(0,0,0,0.4);box-sizing:border-box}
-#hud-section.fullscreen{position:fixed;top:16px;left:16px;right:16px;bottom:16px;max-width:none;z-index:30;background:rgba(5,12,18,.96);padding:16px;border-radius:12px;border:1px solid #30404b;display:flex;flex-direction:column}
+/* Left-aligned CAD UI for PC & Mobile */
+#top-left{position:absolute;left:14px;top:14px;z-index:20;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+#menu-toggle{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;font-weight:700;letter-spacing:0.05em;border-radius:0;background:#0f1722;border:1px solid #28394a;box-shadow:none;text-transform:uppercase}
+
+#hud-section{position:absolute;left:14px;top:54px;z-index:15;background:#0c131c;border:1px solid #233446;border-radius:0;padding:12px;min-width:340px;max-width:370px;box-shadow:0 0 0 1px #000000;box-sizing:border-box}
+#hud-section.fullscreen{position:fixed;top:14px;left:14px;right:14px;bottom:14px;max-width:none;z-index:30;background:#090e15;padding:14px;border-radius:0;border:1px solid #233446;display:flex;flex-direction:column}
 #hud-section.fullscreen #list{max-height:none;flex:1}
 
-#operation-section{display:none;position:absolute;left:372px;top:16px;z-index:20;background:rgba(5,12,18,.92);border:1px solid #30404b;border-radius:12px;padding:14px;backdrop-filter:blur(10px);min-width:260px;max-width:300px;box-shadow:0 8px 24px rgba(0,0,0,0.4);box-sizing:border-box}
-#operation-section.open{display:flex;flex-direction:column;gap:10px}
+#operation-section{display:none;position:absolute;left:370px;top:14px;z-index:20;background:#0c131c;border:1px solid #233446;border-radius:0;padding:12px;min-width:260px;max-width:300px;box-shadow:0 0 0 1px #000000;box-sizing:border-box}
+#operation-section.open{display:flex;flex-direction:column;gap:8px}
 
-.menu-section-title{font-size:13px;font-weight:700;color:#38bdf8;margin:0 0 4px;padding-bottom:4px;border-bottom:1px solid #30404b;display:flex;align-items:center;justify-content:space-between}
+.menu-section-title{font-size:12px;font-weight:700;letter-spacing:0.06em;color:#00e5ff;margin:0 0 4px;padding-bottom:4px;border-bottom:1px solid #233446;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase}
 
-.menu-buttons{display:flex;flex-direction:column;gap:8px}
-.theme-btn{background:rgba(255,255,255,.05);border:1px solid #30404b;border-radius:10px;color:#e8f0f5;padding:8px 12px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s ease;text-align:left}
-.theme-btn:hover{background:#12202a}
-.theme-btn.active-blue{background:#0284c7 !important;border-color:#38bdf8 !important;color:#ffffff !important}
-.theme-btn.active-orange{background:#ea580c !important;border-color:#f97316 !important;color:#ffffff !important}
-#legend{background:rgba(255,255,255,.03);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px;backdrop-filter:blur(8px)}
-#help{position:absolute;left:16px;bottom:16px;z-index:5;color:#91a4b0;font-size:12px}
+.menu-buttons{display:flex;flex-direction:column;gap:6px}
+.theme-btn{background:#111b27;border:1px solid #233446;border-radius:0;color:#c5d2dc;padding:7px 10px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-align:left;letter-spacing:0.02em}
+.theme-btn:hover{background:#182637;border-color:#3b526b;color:#ffffff}
+.theme-btn.active-blue{background:#0284c7 !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700}
+.theme-btn.active-orange{background:#c2410c !important;border-color:#f97316 !important;color:#ffffff !important;font-weight:700}
+#legend{background:#090e15;border:1px solid #1c2b3a;border-radius:0;padding:8px 10px;font-size:11px;line-height:1.45}
+#help{position:absolute;left:14px;bottom:12px;z-index:5;color:#5c7388;font-size:11px;font-family:inherit}
 
-/* Timelapse control bar at bottom center */
-#timelapse-bar{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(5,12,18,.88);border:1px solid #30404b;border-radius:12px;padding:10px 18px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:520px;max-width:calc(100vw - 40px)}
-#tl-play{background:#0284c7;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;transition:background .2s ease}
+/* CAD Technical Timelapse Control Bar */
+#timelapse-bar{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);z-index:10;background:#0c131c;border:1px solid #233446;border-radius:0;padding:8px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 0 0 1px #000000;min-width:520px;max-width:calc(100vw - 32px)}
+#tl-play{background:#0284c7;border:1px solid #00e5ff;color:#fff;border-radius:0;padding:5px 12px;font-weight:700;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-transform:uppercase}
 #tl-play:hover{background:#0369a1}
-#tl-slider{flex:1;height:6px;accent-color:#38bdf8;cursor:pointer}
-#tl-speed{background:#12202a;border:1px solid #3a4d59;color:#e8f0f5;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
-#tl-date{font-size:12px;font-family:monospace;color:#38bdf8;min-width:130px;text-align:right}
+#tl-slider{flex:1;height:4px;accent-color:#00e5ff;cursor:pointer;border-radius:0}
+#tl-speed{background:#090e15;border:1px solid #233446;color:#c5d2dc;border-radius:0;padding:3px 6px;font-size:11px;font-family:inherit;cursor:pointer}
+#tl-date{font-size:11px;font-family:inherit;color:#00e5ff;min-width:140px;text-align:right;font-weight:600}
 
-body.light-mode #timelapse-bar{background:rgba(255,255,255,.92);border-color:#cfd8dc;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-body.light-mode #tl-speed{background:#e2e8f0;border-color:#cbd5e1;color:#1c2833}
+body.light-mode #timelapse-bar{background:#f1f5f9;border-color:#cbd5e1;box-shadow:none}
+body.light-mode #tl-speed{background:#ffffff;border-color:#94a3b8;color:#0f172a}
 body.light-mode #tl-date{color:#0284c7}
-h1{font-size:15px;margin:0}
-#status{font-size:12px;color:#9fb2be;margin-bottom:8px}
-#latest{font-size:13px;line-height:1.55}
-#summary{font-size:12px;color:#b9cbd4;margin:8px 0}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px 0}
-.tab{border:1px solid #3a4d59;background:#12202a;color:#b8c8d1;border-radius:6px;padding:6px 5px;cursor:pointer;font-size:12px}
-.tab:hover{background:#1a2d38}
-.tab.active{background:#29404d;color:#fff;border-color:#617987}
-#list{margin-top:10px;max-height:260px;overflow-y:auto;border-top:1px solid #263842}
-#list::-webkit-scrollbar{width:5px}
-#list::-webkit-scrollbar-track{background:transparent}
-#list::-webkit-scrollbar-thumb{background:#3a4d59;border-radius:10px}
-#list::-webkit-scrollbar-thumb:hover{background:#5a7282}
+h1{font-size:14px;margin:0;letter-spacing:0.04em}
+#status{font-size:11px;color:#607a90;margin-bottom:6px}
+#latest{font-size:12px;line-height:1.5}
+#summary{font-size:11px;color:#809ab0;margin:6px 0}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:8px 0}
+.tab{border:1px solid #233446;background:#0f1722;color:#809ab0;border-radius:0;padding:5px 4px;cursor:pointer;font-size:11px;font-family:inherit;text-align:center}
+.tab:hover{background:#182637;color:#c5d2dc}
+.tab.active{background:#1e2d3d;color:#00e5ff;border-color:#00e5ff;font-weight:700}
+#list{margin-top:8px;max-height:260px;overflow-y:auto;border-top:1px solid #1c2b3a}
+#list::-webkit-scrollbar{width:4px}
+#list::-webkit-scrollbar-track{background:#090e15}
+#list::-webkit-scrollbar-thumb{background:#233446;border-radius:0}
+#list::-webkit-scrollbar-thumb:hover{background:#3b526b}
 body.light-mode #list::-webkit-scrollbar-thumb{background:#cbd5e1}
 body.light-mode #list::-webkit-scrollbar-thumb:hover{background:#94a3b8}
-.quake-row{padding:8px 3px;border-bottom:1px solid #263842;cursor:pointer}
-.quake-row:hover{background:rgba(255,255,255,.04)}
-.quake-title{font-weight:600;font-size:12px}
-.quake-meta{font-size:11px;color:#91a6b2;margin-top:2px}
-.badge{display:inline-block;border:1px solid #4c626f;border-radius:4px;padding:1px 4px;margin-right:5px;color:#ffd1bf}
-.badge-blue{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,0.12)}
-.badge-yellow{border-color:#facc15;color:#facc15;background:rgba(250,204,21,0.12)}
-.badge-red{border-color:#f87171;color:#f87171;background:rgba(248,113,113,0.12)}
-.hud-collapse-btn{background:rgba(255,255,255,.08);border:1px solid #3a4d59;color:#9fb2be;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;transition:all .2s ease}
-.hud-collapse-btn:hover{background:rgba(255,255,255,.18);color:#fff}
+.quake-row{padding:6px 4px;border-bottom:1px solid #1c2b3a;cursor:pointer}
+.quake-row:hover{background:#111c29}
+.quake-title{font-weight:700;font-size:11px;letter-spacing:0.02em}
+.quake-meta{font-size:10px;color:#718a9e;margin-top:2px}
+.badge{display:inline-block;border:1px solid #3b526b;border-radius:0;padding:0px 4px;margin-right:5px;font-size:10px;font-weight:700;color:#c5d2dc}
+.badge-blue{border-color:#00e5ff;color:#00e5ff;background:rgba(0,229,255,0.08)}
+.badge-yellow{border-color:#eab308;color:#eab308;background:rgba(234,179,8,0.08)}
+.badge-red{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.08)}
+.hud-collapse-btn{background:#111b27;border:1px solid #233446;color:#809ab0;border-radius:0;padding:2px 6px;font-size:10px;font-family:inherit;cursor:pointer;transition:all .15s ease}
+.hud-collapse-btn:hover{background:#182637;color:#fff;border-color:#3b526b}
 
-/* Light mode styles */
-body.light-mode{background:#f0f4f8;color:#1c2833}
-body.light-mode #hud-section{background:rgba(255,255,255,.90);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 16px rgba(0,0,0,.08)}
-body.light-mode #hud-section.fullscreen{background:rgba(255,255,255,.98);border-color:#cfd8dc}
-body.light-mode #operation-section{background:rgba(255,255,255,.94);border-color:#cfd8dc;color:#1c2833;box-shadow:0 8px 24px rgba(0,0,0,.12)}
-body.light-mode .hud-collapse-btn{background:#e2e8f0;border-color:#cbd5e1;color:#475569}
-body.light-mode .hud-collapse-btn:hover{background:#cbd5e1;color:#0f172a}
-body.light-mode #status{color:#546e7a}
-body.light-mode #summary{color:#37474f}
-body.light-mode .tab{background:#e2e8f0;border-color:#cbd5e1;color:#334155}
-body.light-mode .tab:hover{background:#cbd5e1}
+/* CAD Light mode styles */
+body.light-mode{background:#f8fafc;color:#0f172a}
+body.light-mode #hud-section{background:#ffffff;border-color:#cbd5e1;color:#0f172a;box-shadow:0 0 0 1px #e2e8f0}
+body.light-mode #hud-section.fullscreen{background:#ffffff;border-color:#cbd5e1}
+body.light-mode #operation-section{background:#ffffff;border-color:#cbd5e1;color:#0f172a;box-shadow:0 0 0 1px #e2e8f0}
+body.light-mode .hud-collapse-btn{background:#f1f5f9;border-color:#cbd5e1;color:#475569}
+body.light-mode .hud-collapse-btn:hover{background:#e2e8f0;color:#0f172a}
+body.light-mode #status{color:#64748b}
+body.light-mode #summary{color:#475569}
+body.light-mode .tab{background:#f1f5f9;border-color:#cbd5e1;color:#475569}
+body.light-mode .tab:hover{background:#e2e8f0}
 body.light-mode .tab.active{background:#0284c7;color:#fff;border-color:#0284c7}
-body.light-mode #list{border-top-color:#cbd5e1}
-body.light-mode .quake-row{border-bottom-color:#e2e8f0}
-body.light-mode .quake-row:hover{background:rgba(0,0,0,.04)}
+body.light-mode #list{border-top-color:#e2e8f0}
+body.light-mode .quake-row{border-bottom-color:#f1f5f9}
+body.light-mode .quake-row:hover{background:#f1f5f9}
 body.light-mode .quake-meta{color:#64748b}
 body.light-mode .badge{border-color:#94a3b8;color:#0369a1}
-body.light-mode .theme-btn{background:rgba(0,0,0,.04);border-color:#cfd8dc;color:#1c2833}
-body.light-mode .theme-btn:hover{background:#e2e8f0}
-body.light-mode #legend{background:rgba(0,0,0,.02);border-color:#cfd8dc;color:#1c2833}
+body.light-mode .theme-btn{background:#f8fafc;border-color:#cbd5e1;color:#0f172a}
+body.light-mode .theme-btn:hover{background:#f1f5f9}
+body.light-mode #legend{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
 body.light-mode #help{color:#64748b}
 
 /* Smartphone / Mobile optimization */
@@ -98,16 +100,16 @@ body.light-mode #help{color:#64748b}
 
   #hud-section {
     left: 8px;
-    top: 52px;
+    top: 48px;
     min-width: 0;
     max-width: calc(100vw - 16px);
     width: calc(100vw - 16px);
-    padding: 10px 12px;
+    padding: 10px;
   }
 
   #operation-section {
     left: 8px;
-    top: 52px;
+    top: 48px;
     min-width: 0;
     max-width: calc(100vw - 16px);
     width: calc(100vw - 16px);
@@ -123,26 +125,26 @@ body.light-mode #help{color:#64748b}
   }
 
   .tab {
-    padding: 5px 2px;
-    font-size: 11px;
+    padding: 4px 2px;
+    font-size: 10px;
   }
 
   #timelapse-bar {
     bottom: 60px;
-    padding: 8px 12px;
+    padding: 8px 10px;
     min-width: 0;
     width: calc(100vw - 16px);
     max-width: calc(100vw - 16px);
     box-sizing: border-box;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     justify-content: space-between;
-    border-radius: 10px;
+    border-radius: 0;
   }
 
   #tl-play {
-    padding: 5px 10px;
-    font-size: 11px;
+    padding: 4px 8px;
+    font-size: 10px;
   }
 
   #tl-slider {
@@ -152,12 +154,12 @@ body.light-mode #help{color:#64748b}
   }
 
   #tl-speed {
-    padding: 3px 6px;
-    font-size: 11px;
+    padding: 2px 4px;
+    font-size: 10px;
   }
 
   #tl-date {
-    font-size: 11px;
+    font-size: 10px;
     min-width: auto;
   }
 
@@ -174,11 +176,11 @@ body.light-mode #help{color:#64748b}
   }
 
   .quake-title {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .quake-meta {
-    font-size: 10px;
+    font-size: 9px;
   }
 }
 </style>
