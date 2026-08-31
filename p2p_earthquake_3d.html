@@ -261,6 +261,7 @@ body.light-mode #help{color:#64748b}
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
 import {VRButton} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/webxr/VRButton.js';
+import * as BufferGeometryUtils from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/BufferGeometryUtils.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x071018);
@@ -394,28 +395,40 @@ function buildCurvedGrid() {
   const minLat = 20, maxLat = 50;
   const stepDegree = 1;
 
+  const majorPairs = [];
+  const minorPairs = [];
+
   // 緯線 (Parallels)
   for (let lat = minLat; lat <= maxLat; lat += stepDegree) {
     const isMajor = (lat % 5 === 0);
-    const pts = [];
-    for (let lon = minLon; lon <= maxLon; lon += 0.2) {
-      pts.push(geoToSeaLevel3D(lon, lat, 0.1));
+    const targetArr = isMajor ? majorPairs : minorPairs;
+    let prev = geoToSeaLevel3D(minLon, lat, 0.1);
+    for (let lon = minLon + 0.2; lon <= maxLon; lon += 0.2) {
+      const curr = geoToSeaLevel3D(lon, lat, 0.1);
+      targetArr.push(prev, curr);
+      prev = curr;
     }
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const line = new THREE.Line(geo, isMajor ? gridMajorMat : gridMinorMat);
-    curvedGridGroup.add(line);
   }
 
   // 経線 (Meridians)
   for (let lon = minLon; lon <= maxLon; lon += stepDegree) {
     const isMajor = (lon % 5 === 0);
-    const pts = [];
-    for (let lat = minLat; lat <= maxLat; lat += 0.2) {
-      pts.push(geoToSeaLevel3D(lon, lat, 0.1));
+    const targetArr = isMajor ? majorPairs : minorPairs;
+    let prev = geoToSeaLevel3D(lon, minLat, 0.1);
+    for (let lat = minLat + 0.2; lat <= maxLat; lat += 0.2) {
+      const curr = geoToSeaLevel3D(lon, lat, 0.1);
+      targetArr.push(prev, curr);
+      prev = curr;
     }
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const line = new THREE.Line(geo, isMajor ? gridMajorMat : gridMinorMat);
-    curvedGridGroup.add(line);
+  }
+
+  if (majorPairs.length > 0) {
+    const geo = new THREE.BufferGeometry().setFromPoints(majorPairs);
+    curvedGridGroup.add(new THREE.LineSegments(geo, gridMajorMat));
+  }
+  if (minorPairs.length > 0) {
+    const geo = new THREE.BufferGeometry().setFromPoints(minorPairs);
+    curvedGridGroup.add(new THREE.LineSegments(geo, gridMinorMat));
   }
 }
 buildCurvedGrid();
@@ -510,6 +523,11 @@ function addGeoJSON(obj) {
     opacity: 0.8
   });
 
+  const mapGeometries = [];
+  const overlayGeometries = [];
+  const mapLinePairs = [];
+  const overlayLinePairs = [];
+
   function polygon(coords) {
     const shape = new THREE.Shape();
     coords.forEach((p,i)=>{
@@ -527,14 +545,13 @@ function addGeoJSON(obj) {
       pos.setXYZ(i, p3d.x, p3d.y, p3d.z);
     }
     geo.computeVertexNormals();
-
-    const mesh = new THREE.Mesh(geo, mapFillMat);
-    mapGroup.add(mesh);
+    mapGeometries.push(geo);
 
     // 都道府県境界線を細分化して3D地形に沿わせる (表面オフセット +0.35)
     const linePts = interpolateLine(coords, 0.05, 0.35);
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
-    mapGroup.add(new THREE.Line(lineGeo, mapLineMat));
+    for (let k = 0; k < linePts.length - 1; k++) {
+      mapLinePairs.push(linePts[k], linePts[k + 1]);
+    }
 
     // 2. 上空の平面日本地図 (富士山の上空 +45)
     const overlayGeo = new THREE.ShapeGeometry(shape);
@@ -546,14 +563,13 @@ function addGeoJSON(obj) {
       overlayPos.setXYZ(i, p3d.x, p3d.y, p3d.z);
     }
     overlayGeo.computeVertexNormals();
-
-    const overlayMesh = new THREE.Mesh(overlayGeo, overlayFillMat);
-    overlayMapGroup.add(overlayMesh);
+    overlayGeometries.push(overlayGeo);
 
     // 上空マップ境界線
     const overlayLinePts = interpolateSeaLevelLine(coords, 0.05, OVERLAY_ALTITUDE + 0.2);
-    const overlayLineGeo = new THREE.BufferGeometry().setFromPoints(overlayLinePts);
-    overlayMapGroup.add(new THREE.Line(overlayLineGeo, overlayLineMat));
+    for (let k = 0; k < overlayLinePts.length - 1; k++) {
+      overlayLinePairs.push(overlayLinePts[k], overlayLinePts[k + 1]);
+    }
   }
 
   function geometry(g) {
@@ -590,6 +606,24 @@ function addGeoJSON(obj) {
       });
     }
   });
+
+  // バッチ結合（一括ドローコール化）
+  if (mapGeometries.length > 0) {
+    const mergedMapGeo = BufferGeometryUtils.mergeGeometries(mapGeometries);
+    mapGroup.add(new THREE.Mesh(mergedMapGeo, mapFillMat));
+  }
+  if (overlayGeometries.length > 0) {
+    const mergedOverlayGeo = BufferGeometryUtils.mergeGeometries(overlayGeometries);
+    overlayMapGroup.add(new THREE.Mesh(mergedOverlayGeo, overlayFillMat));
+  }
+  if (mapLinePairs.length > 0) {
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(mapLinePairs);
+    mapGroup.add(new THREE.LineSegments(lineGeo, mapLineMat));
+  }
+  if (overlayLinePairs.length > 0) {
+    const overlayLineGeo = new THREE.BufferGeometry().setFromPoints(overlayLinePairs);
+    overlayMapGroup.add(new THREE.LineSegments(overlayLineGeo, overlayLineMat));
+  }
 }
 
 // 公開GeoJSON（都道府県境）
@@ -1084,6 +1118,8 @@ function scaleForMagnitude(m){
   return Math.max(1.5, Math.pow(1.7, m-2.5));
 }
 
+const unitSphereGeo = new THREE.SphereGeometry(1, 12, 8);
+
 function addQuake(q){
   const h=q.earthquake?.hypocenter;
   if(!h) return;
@@ -1094,15 +1130,15 @@ function addQuake(q){
   const radius=Math.min(scaleForMagnitude(h.magnitude),18);
   const color=getDepthColor(h.depth);
 
-  const geo=new THREE.SphereGeometry(radius,20,14);
   const mat=new THREE.MeshBasicMaterial({
     color: color,
     transparent: true,
     opacity: 0.6,
     depthWrite: false
   });
-  const mesh=new THREE.Mesh(geo,mat);
+  const mesh=new THREE.Mesh(unitSphereGeo,mat);
   mesh.position.copy(p);
+  mesh.scale.setScalar(radius);
   mesh.userData={q};
   quakeGroup.add(mesh);
 
@@ -1239,6 +1275,7 @@ function createQuakeLabel(magText, depthKm, color) {
 
 let earthquakes = [];
 let currentView = 'today';
+let cachedViewItems = null;
 
 // タイムラプス管理
 let isTimelapsePlaying = false;
@@ -1249,9 +1286,15 @@ let timelapseSpeedMultiplier = 5;
 
 function initTimelapseTimeline() {
   if (earthquakes.length === 0) return;
-  const times = earthquakes.map(q => quakeDate(q).getTime());
-  timelapseStartTime = Math.min(...times);
-  timelapseEndTime = Math.max(...times);
+  let minT = Infinity;
+  let maxT = -Infinity;
+  for (let i = 0; i < earthquakes.length; i++) {
+    const t = quakeDate(earthquakes[i]).getTime();
+    if (t < minT) minT = t;
+    if (t > maxT) maxT = t;
+  }
+  timelapseStartTime = minT;
+  timelapseEndTime = maxT;
   timelapseCurrentTime = timelapseEndTime;
 
   const slider = document.querySelector('#tl-slider');
@@ -1289,19 +1332,23 @@ speedSelect.addEventListener('change', (e) => {
 });
 
 function applyTimelapseVisibility() {
-  const items = viewItems();
-  const visibleIds = new Set(
-    items.filter(q => quakeDate(q).getTime() <= timelapseCurrentTime).map(q => q.id)
-  );
+  const items = cachedViewItems || viewItems();
+  const visibleIds = new Set();
+  for (let i = 0; i < items.length; i++) {
+    const q = items[i];
+    if (q._timeMs <= timelapseCurrentTime) {
+      visibleIds.add(q.id);
+    }
+  }
 
   quakeMeshes.forEach(({mesh, line, label, q}, id) => {
-    const qTime = quakeDate(q).getTime();
+    const qTime = q._timeMs;
     if (visibleIds.has(id)) {
       mesh.visible = true;
       line.visible = true;
       if (label) label.visible = true;
 
-      // 直近発生(3秒以内)にP/S波の波紋アニメーション
+      // 直近発生(2秒以内)にP/S波の波紋アニメーション
       const diffSec = (timelapseCurrentTime - qTime) / 1000;
       if (diffSec >= 0 && diffSec < 2.0 && isTimelapsePlaying) {
         if (!mesh.userData.hasTriggeredShockwave) {
@@ -1320,11 +1367,18 @@ function applyTimelapseVisibility() {
 
 function validEarthquake(q){
   const h=q?.earthquake?.hypocenter;
-  return q?.code===551 && h && h.latitude>-100 && h.longitude>-100 && h.depth>=0;
+  if (q?.code===551 && h && h.latitude>-100 && h.longitude>-100 && h.depth>=0) {
+    if (!q._date) {
+      q._date = new Date(q.earthquake.time);
+      q._timeMs = q._date.getTime();
+    }
+    return true;
+  }
+  return false;
 }
 
 function quakeDate(q){
-  return new Date(q.earthquake.time);
+  return q._date || new Date(q.earthquake.time);
 }
 
 function formatTime(q){
@@ -1347,9 +1401,11 @@ function viewItems(){
   }else if(currentView==='month'){
     start.setDate(1); start.setHours(0,0,0,0);
   }else{
-    return earthquakes.slice(0,20);
+    cachedViewItems = earthquakes.slice(0,20);
+    return cachedViewItems;
   }
-  return earthquakes.filter(q=>quakeDate(q)>=start);
+  cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
+  return cachedViewItems;
 }
 
 function getMagnitudeBadgeClass(q){
