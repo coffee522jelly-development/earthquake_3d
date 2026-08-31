@@ -104,10 +104,7 @@ body.light-mode #help{color:#64748b}
   }
 
   #hud-expand {
-    left: 8px;
-    top: 8px;
-    padding: 6px 12px;
-    font-size: 12px;
+    display: none !important; /* スマホではメニュー内に内包するため独立ボタンは非表示 */
   }
 
   #list {
@@ -265,6 +262,7 @@ body.light-mode #help{color:#64748b}
     <button id="menu-toggle" class="theme-btn">⚙️ メニュー</button>
     <div id="menu-content">
       <div class="menu-buttons">
+        <button id="hud-menu-toggle" class="theme-btn active-blue">📊 地震情報パネル</button>
         <button id="overlay-toggle" class="theme-btn active-blue">🗺️ 2階地図 (震度面)</button>
         <button id="volcano-toggle" class="theme-btn active-orange">🌋 活火山</button>
         <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
@@ -1498,6 +1496,7 @@ const hudEl = document.querySelector('#hud');
 const hudToggleBtn = document.querySelector('#hud-toggle');
 const hudExpandBtn = document.querySelector('#hud-expand');
 const hudFullscreenBtn = document.querySelector('#hud-fullscreen');
+const hudMenuToggleBtn = document.querySelector('#hud-menu-toggle');
 
 function setHudCollapsed(collapsed) {
   if (collapsed) {
@@ -1505,10 +1504,19 @@ function setHudCollapsed(collapsed) {
     hudFullscreenBtn.textContent = '⛶ 全画面';
     hudEl.classList.add('collapsed');
     hudExpandBtn.style.display = 'flex';
+    if (hudMenuToggleBtn) hudMenuToggleBtn.classList.remove('active-blue');
   } else {
     hudEl.classList.remove('collapsed');
     hudExpandBtn.style.display = 'none';
+    if (hudMenuToggleBtn) hudMenuToggleBtn.classList.add('active-blue');
   }
+}
+
+if (hudMenuToggleBtn) {
+  hudMenuToggleBtn.addEventListener('click', () => {
+    const isCollapsed = hudEl.classList.contains('collapsed');
+    setHudCollapsed(!isCollapsed);
+  });
 }
 
 function setHudFullscreen(fullscreen) {
