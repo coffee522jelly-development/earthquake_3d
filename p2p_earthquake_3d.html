@@ -24,8 +24,8 @@ canvas{display:block}
 .menu-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .theme-btn{background:#111b27;border:1px solid #233446;border-radius:0;color:#c5d2dc;padding:7px 10px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-align:left;letter-spacing:0.02em}
 .theme-btn:hover{background:#182637;border-color:#3b526b;color:#ffffff}
-.theme-btn.active-blue{background:#0284c7 !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700}
-.theme-btn.active-orange{background:#c2410c !important;border-color:#f97316 !important;color:#ffffff !important;font-weight:700}
+.theme-btn.active-blue{background:#0284c7 !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700;box-shadow:0 0 8px rgba(0,229,255,0.25)}
+.theme-btn.active-orange{background:#b45309 !important;border-color:#f59e0b !important;color:#ffffff !important;font-weight:700;box-shadow:0 0 8px rgba(245,158,11,0.25)}
 #legend{background:#090e15;border:1px solid #1c2b3a;border-radius:0;padding:8px 10px;font-size:11px;line-height:1.45}
 #help{position:absolute;left:14px;bottom:12px;z-index:5;color:#5c7388;font-size:11px;font-family:inherit}
 
@@ -209,9 +209,9 @@ body.light-mode #help{color:#64748b}
           <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
           <div style="font-size:11px;line-height:1.4">
             <span style="color:#ef4444">━</span> Sランク (≥3%: 警固,糸静,布田川等)<br>
-            <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
+            <span style="color:#f59e0b">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
             <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
-            <span style="color:#ec4899">━</span> プレート境界・海溝系
+            <span style="color:#00e5ff">━</span> プレート境界・海溝系
           </div>
           <div style="margin-top:4px;font-size:11px;color:#38bdf8">
             ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
@@ -625,9 +625,9 @@ const GEOJSON_URL='https://raw.githubusercontent.com/dataofjapan/land/master/jap
 // プレート境界・海溝: #ec4899 (マゼンタ)
 
 const COLOR_S_RANK = 0xef4444;
-const COLOR_A_RANK = 0xf97316;
+const COLOR_A_RANK = 0xf59e0b;
 const COLOR_Z_RANK = 0xeab308;
-const COLOR_TROUGH  = 0xec4899;
+const COLOR_TROUGH  = 0x00e5ff;
 
 const MAJOR_FAULTS = [
   // --- 海域プレート境界・巨大トラフ ---
@@ -666,7 +666,46 @@ const MAJOR_FAULTS = [
   { name: '双葉断層', color: COLOR_Z_RANK, width: 1.6, coords: [[140.85, 37.10], [140.95, 37.50], [141.00, 37.90]] }
 ];
 
-function createFaultRibbon(coords, widthDeg, color, surfaceOffset = 0.65) {
+const faultShaderMaterials = [];
+
+const faultVertexShader = `
+  varying vec2 vUv;
+  varying vec3 vWorldPosition;
+  void main() {
+    vUv = uv;
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+  }
+`;
+
+const faultFragmentShader = `
+  uniform float uTime;
+  uniform vec3 uColor;
+  uniform float uOpacity;
+
+  varying vec2 vUv;
+  varying vec3 vWorldPosition;
+
+  void main() {
+    float centerDist = abs(vUv.y - 0.5) * 2.0;
+    float edgeGlow = pow(1.0 - centerDist, 1.4);
+
+    float pulse = sin(vUv.x * 30.0 - uTime * 4.0) * 0.5 + 0.5;
+    pulse = pow(pulse, 3.0);
+
+    float ripple = sin(vUv.x * 70.0 + uTime * 7.0) * 0.15 + 0.85;
+
+    vec3 baseColor = uColor;
+    vec3 glowColor = mix(baseColor, vec3(1.0, 1.0, 1.0), pulse * 0.55);
+
+    float finalAlpha = uOpacity * edgeGlow * (0.6 + pulse * 0.45) * ripple;
+
+    gl_FragColor = vec4(glowColor * (1.0 + pulse * 0.7), finalAlpha);
+  }
+`;
+
+function createFaultRibbon(coords, widthDeg, colorHex, surfaceOffset = 0.65) {
   // 座標列を細分化
   const denseCoords = [];
   const maxStep = 0.03;
@@ -685,20 +724,21 @@ function createFaultRibbon(coords, widthDeg, color, surfaceOffset = 0.65) {
   }
   denseCoords.push(coords[coords.length - 1]);
 
-  const halfWidth = widthDeg * 0.04; // 経度/緯度スケールに合わせた帯幅
+  const halfWidth = widthDeg * 0.04;
   const positions = [];
+  const uvs = [];
   const indices = [];
 
-  for (let i = 0; i < denseCoords.length; i++) {
+  const totalPts = denseCoords.length;
+  for (let i = 0; i < totalPts; i++) {
     let pPrev = denseCoords[Math.max(0, i - 1)];
-    let pNext = denseCoords[Math.min(denseCoords.length - 1, i + 1)];
+    let pNext = denseCoords[Math.min(totalPts - 1, i + 1)];
 
     let dx = pNext[0] - pPrev[0];
     let dy = pNext[1] - pPrev[1];
     let len = Math.hypot(dx, dy);
     if (len < 1e-6) { dx = 1; dy = 0; len = 1; }
 
-    // 進行方向に垂直な法線ベクトル (-dy, dx)
     const nx = -dy / len;
     const ny = dx / len;
 
@@ -716,7 +756,11 @@ function createFaultRibbon(coords, widthDeg, color, surfaceOffset = 0.65) {
     positions.push(vLeft.x, vLeft.y, vLeft.z);
     positions.push(vRight.x, vRight.y, vRight.z);
 
-    if (i < denseCoords.length - 1) {
+    const u = i / (totalPts - 1);
+    uvs.push(u, 0.0);
+    uvs.push(u, 1.0);
+
+    if (i < totalPts - 1) {
       const base = i * 2;
       indices.push(base, base + 1, base + 2);
       indices.push(base + 1, base + 3, base + 2);
@@ -725,16 +769,24 @@ function createFaultRibbon(coords, widthDeg, color, surfaceOffset = 0.65) {
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(indices);
   geo.computeVertexNormals();
 
-  const mat = new THREE.MeshBasicMaterial({
-    color: color,
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: faultVertexShader,
+    fragmentShader: faultFragmentShader,
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(colorHex) },
+      uOpacity: { value: 0.85 }
+    },
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.75,
     depthWrite: false
   });
+
+  faultShaderMaterials.push(mat);
 
   return new THREE.Mesh(geo, mat);
 }
@@ -1150,47 +1202,96 @@ function addQuake(q){
   quakeMeshes.set(q.id, {mesh, line, label, q});
 }
 
-// 衝撃波（波紋）エフェクト管理
+// 衝撃波（P波・S波 複合波紋）エフェクト管理
 const shockwaves = [];
 const shockwaveGroup = new THREE.Group();
 worldGroup.add(shockwaveGroup);
 
+const shockwaveVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const shockwaveFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uProgress;
+  uniform float uOpacity;
+  varying vec2 vUv;
+
+  void main() {
+    float dist = length(vUv - vec2(0.5));
+    if (dist > 0.5) discard;
+
+    // Outer P-wave ring (fast compression wave)
+    float pWavePos = 0.45;
+    float pRing = smoothstep(0.06, 0.0, abs(dist - pWavePos));
+
+    // Inner S-wave ring (secondary high-amplitude shear wave)
+    float sWavePos = 0.28;
+    float sRing = smoothstep(0.08, 0.0, abs(dist - sWavePos)) * 1.3;
+
+    // Concentric micro ripples
+    float micro = sin(dist * 80.0 - uProgress * 25.0) * 0.5 + 0.5;
+
+    float waveIntensity = (pRing * 1.2 + sRing + micro * 0.25);
+    float edgeFade = smoothstep(0.5, 0.35, dist) * smoothstep(0.0, 0.1, dist);
+
+    vec3 waveColor = mix(uColor, vec3(1.0, 1.0, 1.0), pRing * 0.6 + sRing * 0.4);
+    float alpha = waveIntensity * edgeFade * uOpacity;
+
+    gl_FragColor = vec4(waveColor * (1.0 + pRing * 0.8), alpha);
+  }
+`;
+
 function createShockwave(pos, color, mag) {
-  const ringGeo = new THREE.RingGeometry(0.5, 2.0, 32);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: color,
+  const planeGeo = new THREE.PlaneGeometry(2.0, 2.0, 1, 1);
+  const shaderMat = new THREE.ShaderMaterial({
+    vertexShader: shockwaveVertexShader,
+    fragmentShader: shockwaveFragmentShader,
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uProgress: { value: 0.0 },
+      uOpacity: { value: 0.9 }
+    },
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.8,
     depthWrite: false
   });
-  const mesh = new THREE.Mesh(ringGeo, ringMat);
+
+  const mesh = new THREE.Mesh(planeGeo, shaderMat);
   mesh.position.copy(pos);
   mesh.rotation.x = -Math.PI / 2;
   shockwaveGroup.add(mesh);
 
   shockwaves.push({
     mesh,
-    maxRadius: Math.max(15, scaleForMagnitude(mag) * 6),
+    material: shaderMat,
+    maxRadius: Math.max(18, scaleForMagnitude(mag) * 7),
     currentRadius: 1,
-    opacity: 0.85
+    opacity: 0.9,
+    progress: 0.0
   });
 }
 
 function updateShockwaves(dt) {
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const sw = shockwaves[i];
-    sw.currentRadius += dt * 35.0;
-    sw.opacity -= dt * 0.9;
+    sw.currentRadius += dt * 38.0;
+    sw.opacity -= dt * 0.85;
+    sw.progress += dt * 3.0;
 
     if (sw.opacity <= 0 || sw.currentRadius >= sw.maxRadius) {
       shockwaveGroup.remove(sw.mesh);
       sw.mesh.geometry.dispose();
-      sw.mesh.material.dispose();
+      sw.material.dispose();
       shockwaves.splice(i, 1);
     } else {
       sw.mesh.scale.setScalar(sw.currentRadius);
-      sw.mesh.material.opacity = sw.opacity;
+      sw.material.uniforms.uOpacity.value = Math.max(0, sw.opacity);
+      sw.material.uniforms.uProgress.value = sw.progress;
     }
   }
 }
@@ -1784,6 +1885,11 @@ function animate(){
     if (slider) slider.value = ((timelapseCurrentTime - timelapseStartTime) / (timelapseEndTime - timelapseStartTime)) * 1000;
     updateTimelapseDateDisplay();
     applyTimelapseVisibility();
+  }
+
+  const elapsedTime = clock.getElapsedTime();
+  for (let i = 0; i < faultShaderMaterials.length; i++) {
+    faultShaderMaterials[i].uniforms.uTime.value = elapsedTime;
   }
 
   updateShockwaves(dt);
