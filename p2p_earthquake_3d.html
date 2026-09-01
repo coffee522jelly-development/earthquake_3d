@@ -5,105 +5,221 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>P2P地震情報 3D Earthquake Viewer</title>
 <style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018;color:#e8f0f5;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+/* CAD / GIS Engineering Flat Technical Theme */
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090e15;color:#c5d2dc;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;letter-spacing:-0.01em}
 #app{width:100%;height:100%;position:relative}
 canvas{display:block}
-#hud{position:absolute;left:16px;top:16px;z-index:5;background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);min-width:340px;max-width:calc(100vw - 32px)}
 
-/* Timelapse control bar at bottom center */
-#timelapse-bar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(5,12,18,.88);border:1px solid #30404b;border-radius:12px;padding:10px 18px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:520px;max-width:calc(100vw - 40px)}
-#tl-play{background:#0284c7;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;transition:background .2s ease}
+/* Left-aligned CAD UI for PC & Mobile */
+#top-left{position:absolute;left:14px;top:14px;z-index:20;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+#menu-toggle{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;font-weight:700;letter-spacing:0.05em;border-radius:0;background:#0f1722;border:1px solid #28394a;box-shadow:none;text-transform:uppercase;cursor:pointer}
+
+#menu-panel{display:flex;flex-direction:column;gap:10px;background:#0c131c;border:1px solid #233446;border-radius:0;padding:12px;width:360px;max-width:calc(100vw - 28px);max-height:calc(100vh - 80px);overflow-y:auto;box-shadow:0 0 0 1px #000000;box-sizing:border-box}
+#menu-panel.closed{display:none}
+#menu-panel.fullscreen{position:fixed;top:14px;left:14px;right:14px;bottom:14px;width:auto;max-width:none;max-height:none;z-index:30;background:#090e15;padding:14px}
+#menu-panel.fullscreen #list{max-height:none;flex:1}
+
+.menu-section-title{font-size:12px;font-weight:700;letter-spacing:0.06em;color:#00e5ff;margin:0 0 4px;padding-bottom:4px;border-bottom:1px solid #233446;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase}
+
+.menu-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.theme-btn{background:#111b27;border:1px solid #233446;border-radius:0;color:#c5d2dc;padding:7px 10px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-align:left;letter-spacing:0.02em}
+.theme-btn:hover{background:#182637;border-color:#3b526b;color:#ffffff}
+.theme-btn.active-blue{background:#0284c7 !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700}
+.theme-btn.active-orange{background:#c2410c !important;border-color:#f97316 !important;color:#ffffff !important;font-weight:700}
+#legend{background:#090e15;border:1px solid #1c2b3a;border-radius:0;padding:8px 10px;font-size:11px;line-height:1.45}
+#help{position:absolute;left:14px;bottom:12px;z-index:5;color:#5c7388;font-size:11px;font-family:inherit}
+
+/* CAD Technical Timelapse Control Bar */
+#timelapse-bar{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);z-index:10;background:#0c131c;border:1px solid #233446;border-radius:0;padding:8px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 0 0 1px #000000;min-width:520px;max-width:calc(100vw - 32px)}
+#tl-play{background:#0284c7;border:1px solid #00e5ff;color:#fff;border-radius:0;padding:5px 12px;font-weight:700;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-transform:uppercase}
 #tl-play:hover{background:#0369a1}
-#tl-slider{flex:1;height:6px;accent-color:#38bdf8;cursor:pointer}
-#tl-speed{background:#12202a;border:1px solid #3a4d59;color:#e8f0f5;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
-#tl-date{font-size:12px;font-family:monospace;color:#38bdf8;min-width:130px;text-align:right}
+#tl-slider{flex:1;height:4px;accent-color:#00e5ff;cursor:pointer;border-radius:0}
+#tl-speed{background:#090e15;border:1px solid #233446;color:#c5d2dc;border-radius:0;padding:3px 6px;font-size:11px;font-family:inherit;cursor:pointer}
+#tl-date{font-size:11px;font-family:inherit;color:#00e5ff;min-width:140px;text-align:right;font-weight:600}
 
-body.light-mode #timelapse-bar{background:rgba(255,255,255,.92);border-color:#cfd8dc;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-body.light-mode #tl-speed{background:#e2e8f0;border-color:#cbd5e1;color:#1c2833}
+body.light-mode #timelapse-bar{background:#f1f5f9;border-color:#cbd5e1;box-shadow:none}
+body.light-mode #tl-speed{background:#ffffff;border-color:#94a3b8;color:#0f172a}
 body.light-mode #tl-date{color:#0284c7}
-h1{font-size:16px;margin:0 0 8px}
-#status{font-size:12px;color:#9fb2be;margin-bottom:8px}
-#latest{font-size:13px;line-height:1.55}
-#summary{font-size:12px;color:#b9cbd4;margin:8px 0}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:10px 0}
-.tab{border:1px solid #3a4d59;background:#12202a;color:#b8c8d1;border-radius:6px;padding:6px 5px;cursor:pointer;font-size:12px}
-.tab:hover{background:#1a2d38}
-.tab.active{background:#29404d;color:#fff;border-color:#617987}
-#list{margin-top:10px;max-height:290px;overflow-y:auto;border-top:1px solid #263842}
-#list::-webkit-scrollbar{width:5px}
-#list::-webkit-scrollbar-track{background:transparent}
-#list::-webkit-scrollbar-thumb{background:#3a4d59;border-radius:10px}
-#list::-webkit-scrollbar-thumb:hover{background:#5a7282}
+h1{font-size:14px;margin:0;letter-spacing:0.04em}
+#status{font-size:11px;color:#607a90;margin-bottom:6px}
+#latest{font-size:12px;line-height:1.5}
+#summary{font-size:11px;color:#809ab0;margin:6px 0}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:8px 0}
+.tab{border:1px solid #233446;background:#0f1722;color:#809ab0;border-radius:0;padding:5px 4px;cursor:pointer;font-size:11px;font-family:inherit;text-align:center}
+.tab:hover{background:#182637;color:#c5d2dc}
+.tab.active{background:#1e2d3d;color:#00e5ff;border-color:#00e5ff;font-weight:700}
+#list{margin-top:8px;max-height:260px;overflow-y:auto;border-top:1px solid #1c2b3a}
+#list::-webkit-scrollbar{width:4px}
+#list::-webkit-scrollbar-track{background:#090e15}
+#list::-webkit-scrollbar-thumb{background:#233446;border-radius:0}
+#list::-webkit-scrollbar-thumb:hover{background:#3b526b}
 body.light-mode #list::-webkit-scrollbar-thumb{background:#cbd5e1}
 body.light-mode #list::-webkit-scrollbar-thumb:hover{background:#94a3b8}
-.quake-row{padding:8px 3px;border-bottom:1px solid #263842;cursor:pointer}
-.quake-row:hover{background:rgba(255,255,255,.04)}
-.quake-title{font-weight:600;font-size:12px}
-.quake-meta{font-size:11px;color:#91a6b2;margin-top:2px}
-.badge{display:inline-block;border:1px solid #4c626f;border-radius:4px;padding:1px 4px;margin-right:5px;color:#ffd1bf}
-.badge-blue{border-color:#38bdf8;color:#38bdf8;background:rgba(56,189,248,0.12)}
-.badge-yellow{border-color:#facc15;color:#facc15;background:rgba(250,204,21,0.12)}
-.badge-red{border-color:#f87171;color:#f87171;background:rgba(248,113,113,0.12)}
-#top-right{position:absolute;right:16px;top:16px;z-index:5;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-.theme-btn{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;color:#e8f0f5;padding:8px 12px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s ease}
-.theme-btn:hover{background:#12202a}
-#legend{background:rgba(5,12,18,.82);border:1px solid #30404b;border-radius:10px;padding:10px 12px;font-size:12px;backdrop-filter:blur(8px)}
-#help{position:absolute;left:16px;bottom:16px;z-index:5;color:#91a4b0;font-size:12px}
+.quake-row{padding:6px 4px;border-bottom:1px solid #1c2b3a;cursor:pointer}
+.quake-row:hover{background:#111c29}
+.quake-title{font-weight:700;font-size:11px;letter-spacing:0.02em}
+.quake-meta{font-size:10px;color:#718a9e;margin-top:2px}
+.badge{display:inline-block;border:1px solid #3b526b;border-radius:0;padding:0px 4px;margin-right:5px;font-size:10px;font-weight:700;color:#c5d2dc}
+.badge-blue{border-color:#00e5ff;color:#00e5ff;background:rgba(0,229,255,0.08)}
+.badge-yellow{border-color:#eab308;color:#eab308;background:rgba(234,179,8,0.08)}
+.badge-red{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.08)}
+.hud-collapse-btn{background:#111b27;border:1px solid #233446;color:#809ab0;border-radius:0;padding:2px 6px;font-size:10px;font-family:inherit;cursor:pointer;transition:all .15s ease}
+.hud-collapse-btn:hover{background:#182637;color:#fff;border-color:#3b526b}
 
-/* Light mode styles */
-body.light-mode{background:#f0f4f8;color:#1c2833}
-body.light-mode #hud{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 12px rgba(0,0,0,.08)}
-body.light-mode #status{color:#546e7a}
-body.light-mode #summary{color:#37474f}
-body.light-mode .tab{background:#e2e8f0;border-color:#cbd5e1;color:#334155}
-body.light-mode .tab:hover{background:#cbd5e1}
+/* CAD Light mode styles */
+body.light-mode{background:#f8fafc;color:#0f172a}
+body.light-mode #menu-panel{background:#ffffff;border-color:#cbd5e1;color:#0f172a;box-shadow:0 0 0 1px #e2e8f0}
+body.light-mode #menu-panel.fullscreen{background:#ffffff;border-color:#cbd5e1}
+body.light-mode .hud-collapse-btn{background:#f1f5f9;border-color:#cbd5e1;color:#475569}
+body.light-mode .hud-collapse-btn:hover{background:#e2e8f0;color:#0f172a}
+body.light-mode #status{color:#64748b}
+body.light-mode #summary{color:#475569}
+body.light-mode .tab{background:#f1f5f9;border-color:#cbd5e1;color:#475569}
+body.light-mode .tab:hover{background:#e2e8f0}
 body.light-mode .tab.active{background:#0284c7;color:#fff;border-color:#0284c7}
-body.light-mode #list{border-top-color:#cbd5e1}
-body.light-mode .quake-row{border-bottom-color:#e2e8f0}
-body.light-mode .quake-row:hover{background:rgba(0,0,0,.04)}
+body.light-mode #list{border-top-color:#e2e8f0}
+body.light-mode .quake-row{border-bottom-color:#f1f5f9}
+body.light-mode .quake-row:hover{background:#f1f5f9}
 body.light-mode .quake-meta{color:#64748b}
 body.light-mode .badge{border-color:#94a3b8;color:#0369a1}
-body.light-mode .theme-btn{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833}
-body.light-mode .theme-btn:hover{background:#e2e8f0}
-body.light-mode #legend{background:rgba(255,255,255,.88);border-color:#cfd8dc;color:#1c2833;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+body.light-mode .theme-btn{background:#f8fafc;border-color:#cbd5e1;color:#0f172a}
+body.light-mode .theme-btn:hover{background:#f1f5f9}
+body.light-mode #legend{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
 body.light-mode #help{color:#64748b}
+
+/* Smartphone / Mobile optimization */
+@media (max-width: 768px) {
+  #top-left {
+    left: 8px;
+    top: 8px;
+    max-width: calc(100vw - 16px);
+  }
+
+  #menu-panel {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 120px);
+    padding: 10px;
+  }
+
+  #list {
+    max-height: 22vh;
+  }
+
+  .tabs {
+    gap: 2px;
+  }
+
+  .tab {
+    padding: 4px 2px;
+    font-size: 10px;
+  }
+
+  #timelapse-bar {
+    bottom: 60px;
+    padding: 8px 10px;
+    min-width: 0;
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: space-between;
+    border-radius: 0;
+  }
+
+  #tl-play {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  #tl-slider {
+    order: 3;
+    flex: 1 1 100%;
+    margin-top: 2px;
+  }
+
+  #tl-speed {
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+
+  #tl-date {
+    font-size: 10px;
+    min-width: auto;
+  }
+
+  #help {
+    left: 8px;
+    bottom: 8px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  #list {
+    max-height: 22vh;
+  }
+
+  .quake-title {
+    font-size: 10px;
+  }
+
+  .quake-meta {
+    font-size: 9px;
+  }
+}
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="hud">
-    <h1>日本の地震 — 3D Viewer</h1>
-    <div id="status">地震情報を取得しています…</div>
-    <div class="tabs">
-      <button class="tab active" data-view="today">今日</button>
-      <button class="tab" data-view="week">週</button>
-      <button class="tab" data-view="month">月</button>
-      <button class="tab" data-view="recent">直近</button>
-    </div>
-    <div id="summary"></div>
-    <div id="latest">---</div>
-    <div id="list"></div>
-  </div>
-  <div id="top-right">
-    <div style="display:flex;gap:8px">
-      <button id="volcano-toggle" class="theme-btn" style="background:#ea580c;border-color:#f97316;color:#fff">🌋 活火山</button>
-      <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
-      <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
-    </div>
-    <div id="legend">
-      <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
-      <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
-      <div style="font-size:11px;line-height:1.4">
-        <span style="color:#ef4444">━</span> Sランク (≥3%: 警固,糸静,布田川等)<br>
-        <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
-        <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
-        <span style="color:#ec4899">━</span> プレート境界・海溝系
+  <!-- 左上の統合メニュー (地震情報 & レイヤー操作) -->
+  <div id="top-left">
+    <button id="menu-toggle" class="theme-btn active-blue">⚙️ メニュー</button>
+    <div id="menu-panel">
+      <!-- セクション 1: 日本の地震情報 -->
+      <div id="hud-section">
+        <div class="menu-section-title">
+          <span>📊 日本の地震情報</span>
+          <button id="hud-fullscreen" class="hud-collapse-btn" title="全画面で表示">⛶ 全画面</button>
+        </div>
+        <div id="status">地震情報を取得しています…</div>
+        <div class="tabs">
+          <button class="tab active" data-view="today">今日</button>
+          <button class="tab" data-view="week">週</button>
+          <button class="tab" data-view="month">月</button>
+          <button class="tab" data-view="recent">直近</button>
+        </div>
+        <div id="summary"></div>
+        <div id="latest">---</div>
+        <div id="list"></div>
       </div>
-      <div style="margin-top:4px;font-size:11px;color:#38bdf8">
-        ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
-      </div>
-      <div style="margin-top:4px;font-size:11px;color:#f97316">
-        ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
+
+      <!-- セクション 2: レイヤー・操作 & 凡例 -->
+      <div id="operation-section">
+        <div class="menu-section-title">⚙️ レイヤー・操作</div>
+        <div class="menu-buttons">
+          <button id="overlay-toggle" class="theme-btn active-blue">🗺️ 2階地図 (震度面)</button>
+          <button id="volcano-toggle" class="theme-btn active-orange">🌋 活火山</button>
+          <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
+          <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
+        </div>
+        <div id="legend" style="margin-top:6px">
+          <div>● 震源 (赤: 浅 ～ 青: 深 / 半透明)</div>
+          <div style="margin-top:4px;font-size:11px;color:#a0b0bc">活断層・構造線 発生確率(30年)</div>
+          <div style="font-size:11px;line-height:1.4">
+            <span style="color:#ef4444">━</span> Sランク (≥3%: 警固,糸静,布田川等)<br>
+            <span style="color:#f97316">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
+            <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
+            <span style="color:#ec4899">━</span> プレート境界・海溝系
+          </div>
+          <div style="margin-top:4px;font-size:11px;color:#38bdf8">
+            ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
+          </div>
+          <div style="margin-top:4px;font-size:11px;color:#f97316">
+            ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -134,6 +250,7 @@ body.light-mode #help{color:#64748b}
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
 import {VRButton} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/webxr/VRButton.js';
+import * as BufferGeometryUtils from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/BufferGeometryUtils.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x071018);
@@ -160,16 +277,13 @@ scene.add(dirLight);
 const worldGroup = new THREE.Group();
 scene.add(worldGroup);
 
-const grid = new THREE.GridHelper(900, 30, 0x30414c, 0x17242d);
-grid.rotation.x = 0;
-worldGroup.add(grid);
-
 // 日本の緯度経度をThree.jsのローカル座標へ。
 // 地球の曲率 (半径 R = 1800) を反映した球面座標変換。
 const LON0 = 137.0;
 const LAT0 = 36.0;
 const R_EARTH = 1800.0;
 const DEPTH_SCALE = 3.0;
+const OVERLAY_ALTITUDE = 30.0; // 地表(最高標高22)により近づけた2階震度面日本地図の高度
 
 const RAD = Math.PI / 180.0;
 const sinLat0 = Math.sin(LAT0 * RAD);
@@ -211,6 +325,22 @@ function getElevation(lon, lat) {
   return h;
 }
 
+function geoToSeaLevel3D(lon, lat, offset = 0) {
+  const r = R_EARTH + offset;
+  const dLon = (lon - LON0) * RAD;
+  const phi = lat * RAD;
+  const sinPhi = Math.sin(phi);
+  const cosPhi = Math.cos(phi);
+  const cosDLon = Math.cos(dLon);
+  const sinDLon = Math.sin(dLon);
+
+  const x = r * cosPhi * sinDLon;
+  const y = r * (sinPhi * sinLat0 + cosPhi * cosLat0 * cosDLon) - R_EARTH;
+  const z = -r * (sinPhi * cosLat0 - cosPhi * sinLat0 * cosDLon);
+
+  return new THREE.Vector3(x, y, z);
+}
+
 function geoTo3D(lon, lat, depth=0, surfaceOffset=0) {
   const elev = getElevation(lon, lat);
   const r = R_EARTH + (depth > 0 ? -depth * DEPTH_SCALE : (elev + surfaceOffset));
@@ -227,6 +357,92 @@ function geoTo3D(lon, lat, depth=0, surfaceOffset=0) {
   const z = -r * (sinPhi * cosLat0 - cosPhi * sinLat0 * cosDLon);
 
   return new THREE.Vector3(x, y, z);
+}
+
+// 地球曲率に沿う海面標高0kmの球面経緯度グリッド (日本列島周辺)
+const curvedGridGroup = new THREE.Group();
+worldGroup.add(curvedGridGroup);
+
+let gridMajorMat, gridMinorMat;
+
+function buildCurvedGrid() {
+  curvedGridGroup.clear();
+
+  gridMajorMat = new THREE.LineBasicMaterial({
+    color: 0x30414c,
+    transparent: true,
+    opacity: 0.65
+  });
+
+  gridMinorMat = new THREE.LineBasicMaterial({
+    color: 0x17242d,
+    transparent: true,
+    opacity: 0.4
+  });
+
+  const minLon = 120, maxLon = 152;
+  const minLat = 20, maxLat = 50;
+  const stepDegree = 1;
+
+  const majorPairs = [];
+  const minorPairs = [];
+
+  // 緯線 (Parallels)
+  for (let lat = minLat; lat <= maxLat; lat += stepDegree) {
+    const isMajor = (lat % 5 === 0);
+    const targetArr = isMajor ? majorPairs : minorPairs;
+    let prev = geoToSeaLevel3D(minLon, lat, 0.1);
+    for (let lon = minLon + 0.2; lon <= maxLon; lon += 0.2) {
+      const curr = geoToSeaLevel3D(lon, lat, 0.1);
+      targetArr.push(prev, curr);
+      prev = curr;
+    }
+  }
+
+  // 経線 (Meridians)
+  for (let lon = minLon; lon <= maxLon; lon += stepDegree) {
+    const isMajor = (lon % 5 === 0);
+    const targetArr = isMajor ? majorPairs : minorPairs;
+    let prev = geoToSeaLevel3D(lon, minLat, 0.1);
+    for (let lat = minLat + 0.2; lat <= maxLat; lat += 0.2) {
+      const curr = geoToSeaLevel3D(lon, lat, 0.1);
+      targetArr.push(prev, curr);
+      prev = curr;
+    }
+  }
+
+  if (majorPairs.length > 0) {
+    const geo = new THREE.BufferGeometry().setFromPoints(majorPairs);
+    curvedGridGroup.add(new THREE.LineSegments(geo, gridMajorMat));
+  }
+  if (minorPairs.length > 0) {
+    const geo = new THREE.BufferGeometry().setFromPoints(minorPairs);
+    curvedGridGroup.add(new THREE.LineSegments(geo, gridMinorMat));
+  }
+}
+buildCurvedGrid();
+
+// 海面指定高度 (offset) に沿って細分化補間するライン
+function interpolateSeaLevelLine(coords, maxStep = 0.05, offset = 45.0) {
+  const resultPts = [];
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(dist / maxStep));
+
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const lon = p1[0] + dx * t;
+      const lat = p1[1] + dy * t;
+      resultPts.push(geoToSeaLevel3D(lon, lat, offset));
+    }
+  }
+  const last = coords[coords.length - 1];
+  resultPts.push(geoToSeaLevel3D(last[0], last[1], offset));
+  return resultPts;
 }
 
 // 2点間(lon1, lat1) -> (lon2, lat2) を細分化して地形(3D標高)に綺麗に沿わせる
@@ -255,6 +471,9 @@ function interpolateLine(coords, maxStep = 0.05, surfaceOffset = 0.6) {
 const mapGroup = new THREE.Group();
 worldGroup.add(mapGroup);
 
+const overlayMapGroup = new THREE.Group();
+worldGroup.add(overlayMapGroup);
+
 const faultGroup = new THREE.Group();
 worldGroup.add(faultGroup);
 
@@ -263,6 +482,9 @@ worldGroup.add(jshisGroup);
 jshisGroup.visible = false;
 
 let mapLineMat, mapFillMat, faultLineMat;
+
+// 都道府県中心座標テーブル
+const prefCenters = new Map();
 
 // GeoJSONをThree.jsの線として描画
 function addGeoJSON(obj) {
@@ -276,6 +498,25 @@ function addGeoJSON(obj) {
     side:THREE.DoubleSide
   });
 
+  const overlayFillMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.6,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.65,
+    side: THREE.DoubleSide
+  });
+  const overlayLineMat = new THREE.LineBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.8
+  });
+
+  const mapGeometries = [];
+  const overlayGeometries = [];
+  const mapLinePairs = [];
+  const overlayLinePairs = [];
+
   function polygon(coords) {
     const shape = new THREE.Shape();
     coords.forEach((p,i)=>{
@@ -283,6 +524,7 @@ function addGeoJSON(obj) {
     });
     shape.closePath();
 
+    // 1. 地形3Dマップ
     const geo = new THREE.ShapeGeometry(shape);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
@@ -292,21 +534,85 @@ function addGeoJSON(obj) {
       pos.setXYZ(i, p3d.x, p3d.y, p3d.z);
     }
     geo.computeVertexNormals();
-
-    const mesh = new THREE.Mesh(geo, mapFillMat);
-    mapGroup.add(mesh);
+    mapGeometries.push(geo);
 
     // 都道府県境界線を細分化して3D地形に沿わせる (表面オフセット +0.35)
     const linePts = interpolateLine(coords, 0.05, 0.35);
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
-    mapGroup.add(new THREE.Line(lineGeo, mapLineMat));
+    for (let k = 0; k < linePts.length - 1; k++) {
+      mapLinePairs.push(linePts[k], linePts[k + 1]);
+    }
+
+    // 2. 上空の平面日本地図 (富士山の上空 +45)
+    const overlayGeo = new THREE.ShapeGeometry(shape);
+    const overlayPos = overlayGeo.attributes.position;
+    for (let i = 0; i < overlayPos.count; i++) {
+      const lon = overlayPos.getX(i);
+      const lat = overlayPos.getY(i);
+      const p3d = geoToSeaLevel3D(lon, lat, OVERLAY_ALTITUDE);
+      overlayPos.setXYZ(i, p3d.x, p3d.y, p3d.z);
+    }
+    overlayGeo.computeVertexNormals();
+    overlayGeometries.push(overlayGeo);
+
+    // 上空マップ境界線
+    const overlayLinePts = interpolateSeaLevelLine(coords, 0.05, OVERLAY_ALTITUDE + 0.2);
+    for (let k = 0; k < overlayLinePts.length - 1; k++) {
+      overlayLinePairs.push(overlayLinePts[k], overlayLinePts[k + 1]);
+    }
   }
 
   function geometry(g) {
     if(g.type==='Polygon') g.coordinates.forEach(polygon);
     if(g.type==='MultiPolygon') g.coordinates.forEach(mp=>mp.forEach(polygon));
   }
-  obj.features.forEach(f=>geometry(f.geometry));
+  obj.features.forEach(f=> {
+    geometry(f.geometry);
+
+    // 都道府県本土（最も頂点数の多いポリゴン）の代表（中心）座標の算出
+    let mainPolygonCoords = null;
+    let maxLen = 0;
+    const findMain = (coords) => {
+      if (typeof coords[0][0] === 'number') {
+        if (coords.length > maxLen) {
+          maxLen = coords.length;
+          mainPolygonCoords = coords;
+        }
+      } else {
+        coords.forEach(c => findMain(c));
+      }
+    };
+    findMain(f.geometry.coordinates);
+
+    if (mainPolygonCoords && f.properties && f.properties.nam_ja) {
+      let sumLon = 0, sumLat = 0;
+      mainPolygonCoords.forEach(pt => {
+        sumLon += pt[0];
+        sumLat += pt[1];
+      });
+      prefCenters.set(f.properties.nam_ja, {
+        lon: sumLon / mainPolygonCoords.length,
+        lat: sumLat / mainPolygonCoords.length
+      });
+    }
+  });
+
+  // バッチ結合（一括ドローコール化）
+  if (mapGeometries.length > 0) {
+    const mergedMapGeo = BufferGeometryUtils.mergeGeometries(mapGeometries);
+    mapGroup.add(new THREE.Mesh(mergedMapGeo, mapFillMat));
+  }
+  if (overlayGeometries.length > 0) {
+    const mergedOverlayGeo = BufferGeometryUtils.mergeGeometries(overlayGeometries);
+    overlayMapGroup.add(new THREE.Mesh(mergedOverlayGeo, overlayFillMat));
+  }
+  if (mapLinePairs.length > 0) {
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(mapLinePairs);
+    mapGroup.add(new THREE.LineSegments(lineGeo, mapLineMat));
+  }
+  if (overlayLinePairs.length > 0) {
+    const overlayLineGeo = new THREE.BufferGeometry().setFromPoints(overlayLinePairs);
+    overlayMapGroup.add(new THREE.LineSegments(overlayLineGeo, overlayLineMat));
+  }
 }
 
 // 公開GeoJSON（都道府県境）
@@ -326,9 +632,11 @@ const COLOR_TROUGH  = 0xec4899;
 const MAJOR_FAULTS = [
   // --- 海域プレート境界・巨大トラフ ---
   { name: '南海トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[130.5, 30.5], [132.0, 31.5], [134.0, 32.5], [136.0, 33.2], [138.0, 34.0], [139.0, 34.8]] },
-  { name: '日本海溝・相模トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[139.0, 34.8], [140.5, 35.0], [142.0, 36.5], [143.5, 38.5], [144.5, 40.5], [145.0, 42.0]] },
-  { name: '千島海溝', color: COLOR_TROUGH, width: 3.8, coords: [[145.0, 42.0], [147.0, 43.5], [149.0, 45.0]] },
-  { name: '琉球トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[123.0, 24.0], [126.0, 26.5], [129.0, 29.0], [130.5, 30.5]] },
+  { name: '相模トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[139.0, 34.8], [139.6, 34.9], [140.5, 34.8], [141.2, 34.5]] },
+  { name: '伊豆・小笠原海溝', color: COLOR_TROUGH, width: 3.8, coords: [[141.2, 34.5], [142.0, 32.0], [143.0, 29.0], [144.0, 26.0]] },
+  { name: '日本海溝', color: COLOR_TROUGH, width: 3.8, coords: [[141.2, 34.5], [142.5, 36.5], [143.8, 38.5], [144.6, 40.5], [145.2, 42.0]] },
+  { name: '千島海溝', color: COLOR_TROUGH, width: 3.8, coords: [[145.2, 42.0], [147.0, 43.5], [149.5, 45.2], [152.0, 47.0]] },
+  { name: '琉球海溝・トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[122.5, 23.5], [125.0, 25.5], [128.0, 28.0], [130.5, 30.5]] },
 
   // --- 大構造線 ---
   { name: '中央構造線', color: COLOR_A_RANK, width: 2.2, coords: [[130.0, 32.5], [132.5, 33.5], [134.5, 34.0], [136.5, 34.5], [138.0, 35.0]] },
@@ -438,20 +746,19 @@ function createFaultLabel(name, hexColor) {
   const ctx = canvas.getContext('2d');
 
   const colorStr = typeof hexColor === 'number' ? '#' + hexColor.toString(16).padStart(6, '0') : hexColor;
+  const text = '⚡ ' + name;
 
   ctx.font = 'Bold 24px system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-  ctx.strokeStyle = colorStr;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(6, 6, canvas.width - 12, canvas.height - 12, 8);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = colorStr;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('⚡ ' + name, canvas.width / 2, canvas.height / 2);
+
+  ctx.strokeStyle = 'rgba(5, 12, 18, 0.9)';
+  ctx.lineWidth = 5;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+  ctx.fillStyle = colorStr;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
   const texture = new THREE.CanvasTexture(canvas);
   const spriteMat = new THREE.SpriteMaterial({
@@ -485,7 +792,8 @@ function addFaults() {
       const midIdx = Math.floor(pts.length / 2);
       const groundPos = pts[midIdx] || pts[0];
       if (groundPos) {
-        const normal = groundPos.clone().normalize();
+        const earthCenter = new THREE.Vector3(0, -R_EARTH, 0);
+        const normal = groundPos.clone().sub(earthCenter).normalize();
         const poleHeight = 22;
         const topPos = groundPos.clone().add(normal.clone().multiplyScalar(poleHeight));
 
@@ -516,11 +824,115 @@ async function loadMap(){
   addFaults();
 }
 
-// 地震
+// 地震 & 震度表示
 const quakeGroup = new THREE.Group();
 worldGroup.add(quakeGroup);
 
+const intensityGroup = new THREE.Group();
+worldGroup.add(intensityGroup);
+
 const quakeMeshes = new Map();
+
+// 気象庁震度カラー & テキスト変換
+function getIntensityInfo(scale) {
+  // scale: 10 -> 1, 20 -> 2, 30 -> 3, 40 -> 4, 45 -> 5弱, 50 -> 5強, 55 -> 6弱, 60 -> 6強, 70 -> 7
+  if (scale >= 70) return { text: '7', color: '#a855f7', hex: 0xa855f7 };
+  if (scale >= 60) return { text: '6強', color: '#ef4444', hex: 0xef4444 };
+  if (scale >= 55) return { text: '6弱', color: '#f87171', hex: 0xf87171 };
+  if (scale >= 50) return { text: '5強', color: '#f97316', hex: 0xf97316 };
+  if (scale >= 45) return { text: '5弱', color: '#fb923c', hex: 0xfb923c };
+  if (scale >= 40) return { text: '4', color: '#eab308', hex: 0xeab308 };
+  if (scale >= 30) return { text: '3', color: '#84cc16', hex: 0x84cc16 };
+  if (scale >= 20) return { text: '2', color: '#22c55e', hex: 0x22c55e };
+  return { text: '1', color: '#0284c7', hex: 0x0284c7 };
+}
+
+function createIntensityLabel(scaleText, colorStr) {
+  const canvas = document.createElement('canvas');
+  const size = 128;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // 四角いカラーバッジ枠 (角丸)
+  const pad = 12;
+  const boxSize = size - pad * 2;
+  const radius = 18;
+
+  ctx.fillStyle = colorStr;
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, boxSize, boxSize, radius);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  // 震度文字 (白太字)
+  ctx.font = 'Bold ' + (scaleText.length > 1 ? '52px' : '68px') + ' system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(scaleText, size / 2, size / 2 + (scaleText.length > 1 ? 2 : 4));
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(12, 12, 1);
+  return sprite;
+}
+
+function showQuakeIntensities(q) {
+  intensityGroup.clear();
+  if (!q || !Array.isArray(q.points) || q.points.length === 0) return;
+
+  // 各都道府県（または観測地点）ごとの最大震度をまとめる
+  const prefMaxScale = new Map();
+  q.points.forEach(pt => {
+    if (!pt.pref || pt.scale == null || pt.scale < 10) return;
+    const current = prefMaxScale.get(pt.pref);
+    if (!current || pt.scale > current.scale) {
+      prefMaxScale.set(pt.pref, { scale: pt.scale, addr: pt.addr });
+    }
+  });
+
+  prefMaxScale.forEach(({ scale }, prefName) => {
+    const center = prefCenters.get(prefName);
+    if (!center) return;
+
+    const info = getIntensityInfo(scale);
+    const groundPos = geoTo3D(center.lon, center.lat, 0, 0.8);
+    // 上空平面地図上の対応位置 (高度30km)
+    const overlayPos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE);
+    // 2階地図の直上にわずかに浮かせる (高度33.5km)
+    const badgePos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE + 3.5);
+
+    // 地表から上空平面日本地図への指示ポール（鉛直高さ方向線）
+    const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, badgePos]);
+    const poleMat = new THREE.LineDashedMaterial({
+      color: info.hex,
+      dashSize: 1,
+      gapSize: 0.5,
+      transparent: true,
+      opacity: 0.85
+    });
+    const poleLine = new THREE.Line(poleGeo, poleMat);
+    poleLine.computeLineDistances();
+    intensityGroup.add(poleLine);
+
+    // 上空平面地図上に浮かぶ震度四角バッジラベル
+    const label = createIntensityLabel(info.text, info.color);
+    label.position.copy(badgePos);
+    intensityGroup.add(label);
+  });
+}
 
 function getDepthColor(depth){
   const maxDepth = 300;
@@ -635,18 +1047,28 @@ function initVolcanoes() {
 }
 initVolcanoes();
 
+// 操作メニュー開閉トグル
+const menuToggleBtn = document.querySelector('#menu-toggle');
+const menuPanel = document.querySelector('#menu-panel');
+
+if (menuToggleBtn && menuPanel) {
+  menuToggleBtn.addEventListener('click', () => {
+    menuPanel.classList.toggle('closed');
+    const isOpen = !menuPanel.classList.contains('closed');
+    menuToggleBtn.classList.toggle('active-blue', isOpen);
+  });
+}
+
+document.querySelector('#overlay-toggle').addEventListener('click', () => {
+  overlayMapGroup.visible = !overlayMapGroup.visible;
+  const btn = document.querySelector('#overlay-toggle');
+  btn.classList.toggle('active-blue', overlayMapGroup.visible);
+});
+
 document.querySelector('#volcano-toggle').addEventListener('click', () => {
   volcanoGroup.visible = !volcanoGroup.visible;
   const btn = document.querySelector('#volcano-toggle');
-  if (volcanoGroup.visible) {
-    btn.style.background = '#ea580c';
-    btn.style.borderColor = '#f97316';
-    btn.style.color = '#ffffff';
-  } else {
-    btn.style.background = '';
-    btn.style.borderColor = '';
-    btn.style.color = '';
-  }
+  btn.classList.toggle('active-orange', volcanoGroup.visible);
 });
 
 const depthRulerGroup = new THREE.Group();
@@ -689,6 +1111,8 @@ function scaleForMagnitude(m){
   return Math.max(1.5, Math.pow(1.7, m-2.5));
 }
 
+const unitSphereGeo = new THREE.SphereGeometry(1, 12, 8);
+
 function addQuake(q){
   const h=q.earthquake?.hypocenter;
   if(!h) return;
@@ -699,15 +1123,15 @@ function addQuake(q){
   const radius=Math.min(scaleForMagnitude(h.magnitude),18);
   const color=getDepthColor(h.depth);
 
-  const geo=new THREE.SphereGeometry(radius,20,14);
   const mat=new THREE.MeshBasicMaterial({
     color: color,
     transparent: true,
     opacity: 0.6,
     depthWrite: false
   });
-  const mesh=new THREE.Mesh(geo,mat);
+  const mesh=new THREE.Mesh(unitSphereGeo,mat);
   mesh.position.copy(p);
+  mesh.scale.setScalar(radius);
   mesh.userData={q};
   quakeGroup.add(mesh);
 
@@ -771,6 +1195,49 @@ function updateShockwaves(dt) {
   }
 }
 
+function focusOnQuake(q, mesh) {
+  if (!mesh) return;
+  const targetPos = mesh.position.clone();
+  controls.target.copy(targetPos);
+
+  // 地球中心 (0, -R_EARTH, 0) から 震源への鉛直上方向ベクトル
+  const centerOfEarth = new THREE.Vector3(0, -R_EARTH, 0);
+  const upNormal = targetPos.clone().sub(centerOfEarth).normalize();
+
+  // 観測点（震度バッジ）の最大広がり距離（バウンディング半径）の計算
+  let maxDist = 0;
+  if (q && Array.isArray(q.points) && q.points.length > 0) {
+    const prefMaxScale = new Map();
+    q.points.forEach(pt => {
+      if (!pt.pref || pt.scale == null || pt.scale < 10) return;
+      const current = prefMaxScale.get(pt.pref);
+      if (!current || pt.scale > current.scale) {
+        prefMaxScale.set(pt.pref, true);
+      }
+    });
+
+    prefMaxScale.forEach((_, prefName) => {
+      const center = prefCenters.get(prefName);
+      if (!center) return;
+      const overlayPos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE);
+      const d = overlayPos.distanceTo(targetPos);
+      if (d > maxDist) maxDist = d;
+    });
+  }
+
+  // 画角 (camera.fov) に震度分布が収まる高度距離を計算
+  const fovRad = (camera.fov * Math.PI / 180.0) / 2.0;
+  const requiredDist = maxDist > 0 ? (maxDist + 50.0) / Math.tan(fovRad) : 260.0;
+  const camDistance = Math.max(180.0, Math.min(750.0, requiredDist));
+
+  // 震源の上空付近から見下げるカメラ配置（標準の camera.up (0,1,0) とマウス操作方向を保持）
+  camera.up.set(0, 1, 0);
+  const offsetDir = upNormal.clone().add(new THREE.Vector3(0, 0, 0.25)).normalize();
+  const camPos = targetPos.clone().add(offsetDir.multiplyScalar(camDistance));
+  camera.position.copy(camPos);
+  controls.update();
+}
+
 function createQuakeLabel(magText, depthKm, color) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -801,6 +1268,7 @@ function createQuakeLabel(magText, depthKm, color) {
 
 let earthquakes = [];
 let currentView = 'today';
+let cachedViewItems = null;
 
 // タイムラプス管理
 let isTimelapsePlaying = false;
@@ -811,9 +1279,15 @@ let timelapseSpeedMultiplier = 5;
 
 function initTimelapseTimeline() {
   if (earthquakes.length === 0) return;
-  const times = earthquakes.map(q => quakeDate(q).getTime());
-  timelapseStartTime = Math.min(...times);
-  timelapseEndTime = Math.max(...times);
+  let minT = Infinity;
+  let maxT = -Infinity;
+  for (let i = 0; i < earthquakes.length; i++) {
+    const t = quakeDate(earthquakes[i]).getTime();
+    if (t < minT) minT = t;
+    if (t > maxT) maxT = t;
+  }
+  timelapseStartTime = minT;
+  timelapseEndTime = maxT;
   timelapseCurrentTime = timelapseEndTime;
 
   const slider = document.querySelector('#tl-slider');
@@ -851,19 +1325,23 @@ speedSelect.addEventListener('change', (e) => {
 });
 
 function applyTimelapseVisibility() {
-  const items = viewItems();
-  const visibleIds = new Set(
-    items.filter(q => quakeDate(q).getTime() <= timelapseCurrentTime).map(q => q.id)
-  );
+  const items = cachedViewItems || viewItems();
+  const visibleIds = new Set();
+  for (let i = 0; i < items.length; i++) {
+    const q = items[i];
+    if (q._timeMs <= timelapseCurrentTime) {
+      visibleIds.add(q.id);
+    }
+  }
 
   quakeMeshes.forEach(({mesh, line, label, q}, id) => {
-    const qTime = quakeDate(q).getTime();
+    const qTime = q._timeMs;
     if (visibleIds.has(id)) {
       mesh.visible = true;
       line.visible = true;
       if (label) label.visible = true;
 
-      // 直近発生(3秒以内)にP/S波の波紋アニメーション
+      // 直近発生(2秒以内)にP/S波の波紋アニメーション
       const diffSec = (timelapseCurrentTime - qTime) / 1000;
       if (diffSec >= 0 && diffSec < 2.0 && isTimelapsePlaying) {
         if (!mesh.userData.hasTriggeredShockwave) {
@@ -882,11 +1360,18 @@ function applyTimelapseVisibility() {
 
 function validEarthquake(q){
   const h=q?.earthquake?.hypocenter;
-  return q?.code===551 && h && h.latitude>-100 && h.longitude>-100 && h.depth>=0;
+  if (q?.code===551 && h && h.latitude>-100 && h.longitude>-100 && h.depth>=0) {
+    if (!q._date) {
+      q._date = new Date(q.earthquake.time);
+      q._timeMs = q._date.getTime();
+    }
+    return true;
+  }
+  return false;
 }
 
 function quakeDate(q){
-  return new Date(q.earthquake.time);
+  return q._date || new Date(q.earthquake.time);
 }
 
 function formatTime(q){
@@ -909,9 +1394,11 @@ function viewItems(){
   }else if(currentView==='month'){
     start.setDate(1); start.setHours(0,0,0,0);
   }else{
-    return earthquakes.slice(0,20);
+    cachedViewItems = earthquakes.slice(0,20);
+    return cachedViewItems;
   }
-  return earthquakes.filter(q=>quakeDate(q)>=start);
+  cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
+  return cachedViewItems;
 }
 
 function getMagnitudeBadgeClass(q){
@@ -920,6 +1407,23 @@ function getMagnitudeBadgeClass(q){
   if(m < 3.0) return 'badge-blue';
   if(m < 5.0) return 'badge-yellow';
   return 'badge-red';
+}
+
+function getTsunamiText(tsunami) {
+  switch (tsunami) {
+    case 'None': return '津波の心配なし';
+    case 'Checking': return '津波調査中';
+    case 'NonEffective': return '若干の海面変動あり';
+    case 'Watch': return '⚠️ 津波注意報';
+    case 'Warning': return '🚨 津波警報';
+    default: return '津波情報なし';
+  }
+}
+
+function getIntensityBadgeHtml(scale) {
+  if (scale == null || scale < 10) return '';
+  const info = getIntensityInfo(scale);
+  return `<span class="badge" style="border-color:${info.color};color:${info.color};background:${info.color}22">震度${info.text}</span>`;
 }
 
 function renderDashboard(){
@@ -934,8 +1438,13 @@ function renderDashboard(){
   if(latest){
     const h=latest.earthquake.hypocenter;
     const d=h.depth>=0 ? `${h.depth} km` : '不明';
+    const maxScaleInfo = latest.earthquake.maxScale != null && latest.earthquake.maxScale >= 10 ? ` 震度${getIntensityInfo(latest.earthquake.maxScale).text}` : '';
+    const tsunamiStr = getTsunamiText(latest.earthquake.domesticTsunami);
+    const pointCount = Array.isArray(latest.points) ? latest.points.length : 0;
     document.querySelector('#latest').innerHTML=
-      `<b>最新：${h.name||'震源不明'}</b><br>${magnitude(latest)} / 深さ ${d} / ${formatTime(latest)}`;
+      `<b>最新：${h.name||'震源不明'}</b> (${magnitude(latest)}${maxScaleInfo})<br>` +
+      `深さ: ${d} / 発生: ${formatTime(latest)}<br>` +
+      `<span style="color:#94a3b8;font-size:11px">津波: ${tsunamiStr} / 観測点数: ${pointCount}ヶ所</span>`;
   }else{
     document.querySelector('#latest').textContent='該当する地震はありません';
   }
@@ -947,14 +1456,24 @@ function renderDashboard(){
     const row=document.createElement('div');
     row.className='quake-row';
     const badgeClass=getMagnitudeBadgeClass(q);
+    const intensityBadge = getIntensityBadgeHtml(q.earthquake?.maxScale);
+    const tsunamiStr = getTsunamiText(q.earthquake?.domesticTsunami);
+    const pointCount = Array.isArray(q.points) ? q.points.length : 0;
+    const maxScaleText = q.earthquake?.maxScale != null && q.earthquake.maxScale >= 10 ? `最大震度 ${getIntensityInfo(q.earthquake.maxScale).text}` : '最大震度不明';
+
     row.innerHTML=
-      `<div class="quake-title"><span class="badge ${badgeClass}">${magnitude(q)}</span>${h.name||'震源不明'}</div>`+
-      `<div class="quake-meta">${formatTime(q)}　深さ ${h.depth} km　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
+      `<div class="quake-title"><span class="badge ${badgeClass}">${magnitude(q)}</span>${intensityBadge}${h.name||'震源不明'}</div>`+
+      `<div class="quake-meta">${formatTime(q)}　${maxScaleText}　深さ ${h.depth} km</div>`+
+      `<div class="quake-meta" style="font-size:10px;opacity:0.85">津波: ${tsunamiStr}　観測 ${pointCount}地点　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
     row.onclick=()=>{
+      // 全画面モード中に地震を選択した場合、3Dビューワーが見えるよう通常表示に戻す
+      if (menuPanel && menuPanel.classList.contains('fullscreen')) {
+        setHudFullscreen(false);
+      }
+      showQuakeIntensities(q);
       const entry=quakeMeshes.get(q.id);
       if(entry && entry.mesh){
-        controls.target.copy(entry.mesh.position);
-        camera.position.copy(entry.mesh.position).add(new THREE.Vector3(70,70,70));
+        focusOnQuake(q, entry.mesh);
       }
     };
     list.appendChild(row);
@@ -968,6 +1487,28 @@ function setView(view){
 }
 
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+
+// HUDパネルの全画面表示機能
+const hudFullscreenBtn = document.querySelector('#hud-fullscreen');
+
+function setHudFullscreen(fullscreen) {
+  if (menuPanel) {
+    if (fullscreen) {
+      menuPanel.classList.add('fullscreen');
+      hudFullscreenBtn.textContent = '🗗 通常表示';
+    } else {
+      menuPanel.classList.remove('fullscreen');
+      hudFullscreenBtn.textContent = '⛶ 全画面';
+    }
+  }
+}
+
+if (hudFullscreenBtn) {
+  hudFullscreenBtn.addEventListener('click', () => {
+    const isFS = menuPanel && menuPanel.classList.contains('fullscreen');
+    setHudFullscreen(!isFS);
+  });
+}
 
 async function loadHistory(){
   let allData = [];
@@ -1023,16 +1564,15 @@ function toggleTheme(){
 
   if(isLightMode){
     scene.background.set(0xf1f5f9);
-    grid.visible = false;
+    if(gridMajorMat) { gridMajorMat.color.set(0x94a3b8); gridMajorMat.opacity = 0.6; }
+    if(gridMinorMat) { gridMinorMat.color.set(0xcbd5e1); gridMinorMat.opacity = 0.4; }
     if(mapLineMat) mapLineMat.color.set(0x64748b);
     if(mapFillMat) mapFillMat.color.set(0xdbeade);
     if(faultLineMat) faultLineMat.color.set(0xd97706);
   } else {
     scene.background.set(0x071018);
-    grid.visible = true;
-    grid.material.color.set(0xffffff);
-    grid.material.transparent = false;
-    grid.material.opacity = 1.0;
+    if(gridMajorMat) { gridMajorMat.color.set(0x30414c); gridMajorMat.opacity = 0.65; }
+    if(gridMinorMat) { gridMinorMat.color.set(0x17242d); gridMinorMat.opacity = 0.4; }
     if(mapLineMat) mapLineMat.color.set(0x8fa9b8);
     if(mapFillMat) mapFillMat.color.set(0x152c38);
     if(faultLineMat) faultLineMat.color.set(0xef4444);
@@ -1042,7 +1582,19 @@ function toggleTheme(){
 document.querySelector('#theme-toggle').addEventListener('click', toggleTheme);
 
 let isJshisLoaded = false;
-const JSHIS_SAMPLE_MESHES = ['54401047N', '53394526N', '53393596N', '53394621N'];
+// 主要都市部・平野部（東京・埼玉・千葉・大阪・名古屋・仙台・福岡等）のJ-SHIS 3次メッシュコード拡張
+const JSHIS_SAMPLE_MESHES = [
+  // 東京・埼玉・千葉（関東平野）
+  '53394526N', '53393596N', '53394621N', '54401047N', '53395506N', '53394586N', '53394720N',
+  // 大阪・兵庫（大阪平野）
+  '52350341N', '52350351N', '52350342N', '52350352N',
+  // 愛知（濃尾平野）
+  '52366781N', '52366791N', '52366782N',
+  // 宮城（仙台平野）
+  '57403672N', '57403682N',
+  // 福岡（筑紫平野）
+  '50303374N', '50303384N'
+];
 
 async function loadJshisSubsurfaceData() {
   if (isJshisLoaded) return;
@@ -1092,13 +1644,43 @@ async function loadJshisSubsurfaceData() {
           }
           geo.computeVertexNormals();
 
-          const mesh = new THREE.Mesh(geo, jshisMat);
+          // 深度に応じた発色（浅い: シアン -> 深い: 青・紫）
+          const color = getDepthColor(Math.min(300, depthKm * 20));
+          const customJshisMat = new THREE.MeshStandardMaterial({
+            color: color,
+            roughness: 0.3,
+            metalness: 0.2,
+            transparent: true,
+            opacity: 0.75,
+            side: THREE.DoubleSide
+          });
+
+          const mesh = new THREE.Mesh(geo, customJshisMat);
           jshisGroup.add(mesh);
 
           // メッシュ枠線
           const edgePts = coords.map(p => geoTo3D(p[0], p[1], depthKm));
           const edgeGeo = new THREE.BufferGeometry().setFromPoints(edgePts);
           jshisGroup.add(new THREE.Line(edgeGeo, jshisEdgeMat));
+
+          // 地表から地下基盤面への垂直ガイド線
+          if (coords.length > 0) {
+            const centerLon = coords.reduce((acc, c) => acc + c[0], 0) / coords.length;
+            const centerLat = coords.reduce((acc, c) => acc + c[1], 0) / coords.length;
+            const surfaceP = geoTo3D(centerLon, centerLat, 0);
+            const bedrockP = geoTo3D(centerLon, centerLat, depthKm);
+            const poleGeo = new THREE.BufferGeometry().setFromPoints([surfaceP, bedrockP]);
+            const poleMat = new THREE.LineDashedMaterial({
+              color: color,
+              dashSize: 0.5,
+              gapSize: 0.3,
+              transparent: true,
+              opacity: 0.6
+            });
+            const pole = new THREE.Line(poleGeo, poleMat);
+            pole.computeLineDistances();
+            jshisGroup.add(pole);
+          }
         }
       });
     } catch (e) {
@@ -1113,15 +1695,31 @@ async function loadJshisSubsurfaceData() {
 document.querySelector('#jshis-toggle').addEventListener('click', async () => {
   jshisGroup.visible = !jshisGroup.visible;
   const btn = document.querySelector('#jshis-toggle');
+  btn.classList.toggle('active-blue', jshisGroup.visible);
   if (jshisGroup.visible) {
-    btn.style.background = '#0284c7';
-    btn.style.borderColor = '#38bdf8';
-    btn.style.color = '#ffffff';
     await loadJshisSubsurfaceData();
-  } else {
-    btn.style.background = '';
-    btn.style.borderColor = '';
-    btn.style.color = '';
+  }
+});
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener('click', (event) => {
+  // HUDやUIエレメント上のクリックは無視
+  if (event.target.closest('#timelapse-bar, #top-left, #hud-section, #VRButton')) return;
+
+  mouse.x = (event.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(quakeGroup.children);
+
+  if (intersects.length > 0) {
+    const hitObj = intersects[0].object;
+    if (hitObj.userData && hitObj.userData.q) {
+      showQuakeIntensities(hitObj.userData.q);
+      focusOnQuake(hitObj.userData.q, hitObj);
+    }
   }
 });
 
