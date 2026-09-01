@@ -643,9 +643,11 @@ const COLOR_TROUGH  = 0xec4899;
 const MAJOR_FAULTS = [
   // --- 海域プレート境界・巨大トラフ ---
   { name: '南海トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[130.5, 30.5], [132.0, 31.5], [134.0, 32.5], [136.0, 33.2], [138.0, 34.0], [139.0, 34.8]] },
-  { name: '日本海溝・相模トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[139.0, 34.8], [140.5, 35.0], [142.0, 36.5], [143.5, 38.5], [144.5, 40.5], [145.0, 42.0]] },
-  { name: '千島海溝', color: COLOR_TROUGH, width: 3.8, coords: [[145.0, 42.0], [147.0, 43.5], [149.0, 45.0]] },
-  { name: '琉球トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[123.0, 24.0], [126.0, 26.5], [129.0, 29.0], [130.5, 30.5]] },
+  { name: '相模トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[139.0, 34.8], [139.6, 34.9], [140.5, 34.8], [141.2, 34.5]] },
+  { name: '伊豆・小笠原海溝', color: COLOR_TROUGH, width: 3.8, coords: [[141.2, 34.5], [142.0, 32.0], [143.0, 29.0], [144.0, 26.0]] },
+  { name: '日本海溝', color: COLOR_TROUGH, width: 3.8, coords: [[141.2, 34.5], [142.5, 36.5], [143.8, 38.5], [144.6, 40.5], [145.2, 42.0]] },
+  { name: '千島海溝', color: COLOR_TROUGH, width: 3.8, coords: [[145.2, 42.0], [147.0, 43.5], [149.5, 45.2], [152.0, 47.0]] },
+  { name: '琉球海溝・トラフ', color: COLOR_TROUGH, width: 3.8, coords: [[122.5, 23.5], [125.0, 25.5], [128.0, 28.0], [130.5, 30.5]] },
 
   // --- 大構造線 ---
   { name: '中央構造線', color: COLOR_A_RANK, width: 2.2, coords: [[130.0, 32.5], [132.5, 33.5], [134.5, 34.0], [136.5, 34.5], [138.0, 35.0]] },
@@ -920,7 +922,7 @@ function showQuakeIntensities(q) {
     // 上空平面地図上の対応位置 (高度45km)
     const overlayPos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE);
     const normal = overlayPos.clone().normalize();
-    const badgePos = overlayPos.clone().add(normal.clone().multiplyScalar(2.5));
+    const badgePos = overlayPos.clone().add(normal.clone().multiplyScalar(12.0));
 
     // 地表から上空平面日本地図への指示ポール（鉛直高さ方向線）
     const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, badgePos]);
