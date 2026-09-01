@@ -481,7 +481,7 @@ const jshisGroup = new THREE.Group();
 worldGroup.add(jshisGroup);
 jshisGroup.visible = false;
 
-let mapLineMat, mapFillMat, faultLineMat;
+let mapLineMat, mapFillMat, faultLineMat, overlayFillMat, overlayLineMat;
 
 // 都道府県中心座標テーブル
 const prefCenters = new Map();
@@ -498,7 +498,7 @@ function addGeoJSON(obj) {
     side:THREE.DoubleSide
   });
 
-  const overlayFillMat = new THREE.MeshStandardMaterial({
+  overlayFillMat = new THREE.MeshStandardMaterial({
     color: 0x1e293b,
     roughness: 0.6,
     metalness: 0.2,
@@ -506,7 +506,7 @@ function addGeoJSON(obj) {
     opacity: 0.65,
     side: THREE.DoubleSide
   });
-  const overlayLineMat = new THREE.LineBasicMaterial({
+  overlayLineMat = new THREE.LineBasicMaterial({
     color: 0x38bdf8,
     transparent: true,
     opacity: 0.8
@@ -1669,6 +1669,8 @@ function toggleTheme(){
     if(gridMinorMat) { gridMinorMat.color.set(0xcbd5e1); gridMinorMat.opacity = 0.4; }
     if(mapLineMat) mapLineMat.color.set(0x64748b);
     if(mapFillMat) mapFillMat.color.set(0xdbeade);
+    if(overlayFillMat) overlayFillMat.color.set(0xbae6fd);
+    if(overlayLineMat) overlayLineMat.color.set(0x0284c7);
     if(faultLineMat) faultLineMat.color.set(0xd97706);
   } else {
     scene.background.set(0x071018);
@@ -1676,6 +1678,8 @@ function toggleTheme(){
     if(gridMinorMat) { gridMinorMat.color.set(0x17242d); gridMinorMat.opacity = 0.4; }
     if(mapLineMat) mapLineMat.color.set(0x8fa9b8);
     if(mapFillMat) mapFillMat.color.set(0x152c38);
+    if(overlayFillMat) overlayFillMat.color.set(0x1e293b);
+    if(overlayLineMat) overlayLineMat.color.set(0x38bdf8);
     if(faultLineMat) faultLineMat.color.set(0xef4444);
   }
 }
