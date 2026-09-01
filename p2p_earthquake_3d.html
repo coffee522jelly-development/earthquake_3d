@@ -803,7 +803,8 @@ function addFaults() {
       const midIdx = Math.floor(pts.length / 2);
       const groundPos = pts[midIdx] || pts[0];
       if (groundPos) {
-        const normal = groundPos.clone().normalize();
+        const earthCenter = new THREE.Vector3(0, -R_EARTH, 0);
+        const normal = groundPos.clone().sub(earthCenter).normalize();
         const poleHeight = 22;
         const topPos = groundPos.clone().add(normal.clone().multiplyScalar(poleHeight));
 
@@ -919,10 +920,10 @@ function showQuakeIntensities(q) {
 
     const info = getIntensityInfo(scale);
     const groundPos = geoTo3D(center.lon, center.lat, 0, 0.8);
-    // 上空平面地図上の対応位置 (高度45km)
+    // 上空平面地図上の対応位置 (高度30km)
     const overlayPos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE);
-    const normal = overlayPos.clone().normalize();
-    const badgePos = overlayPos.clone().add(normal.clone().multiplyScalar(12.0));
+    // 2階地図の直上にわずかに浮かせる (高度33.5km)
+    const badgePos = geoToSeaLevel3D(center.lon, center.lat, OVERLAY_ALTITUDE + 3.5);
 
     // 地表から上空平面日本地図への指示ポール（鉛直高さ方向線）
     const poleGeo = new THREE.BufferGeometry().setFromPoints([groundPos, badgePos]);
