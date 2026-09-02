@@ -27,6 +27,9 @@ canvas{display:block}
 .theme-btn.active-blue{background:linear-gradient(180deg, rgba(14,116,144,0.85) 0%, rgba(3,105,161,0.95) 100%) !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(0,229,255,0.35) !important;text-shadow:0 0 4px rgba(0,229,255,0.6)}
 .theme-btn.active-orange{background:linear-gradient(180deg, rgba(180,83,9,0.85) 0%, rgba(146,64,14,0.95) 100%) !important;border-color:#f59e0b !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(245,158,11,0.35) !important;text-shadow:0 0 4px rgba(245,158,11,0.6)}
 #legend{background:#090e15;border:1px solid #1c2b3a;border-radius:0;padding:8px 10px;font-size:11px;line-height:1.45}
+#coord-hud{position:absolute;right:14px;bottom:12px;z-index:15;background:rgba(12,19,28,0.85);border:1px solid #233446;color:#00e5ff;padding:4px 10px;font-size:11px;font-weight:600;font-family:inherit;box-shadow:0 0 8px rgba(0,0,0,0.5);letter-spacing:0.03em;pointer-events:none}
+body.light-mode #coord-hud{background:rgba(255,255,255,0.9);border-color:#cbd5e1;color:#0284c7;box-shadow:none}
+
 #help{position:absolute;left:14px;bottom:12px;z-index:5;color:#5c7388;font-size:11px;font-family:inherit}
 
 /* CAD Technical Timelapse Control Bar */
@@ -234,6 +237,7 @@ body.light-mode #help{color:#64748b}
       </div>
     </div>
   </div>
+  <div id="coord-hud">緯度: --.--°N / 経度: ---.--°E / 標高: 0m</div>
   <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
 
   <div id="timelapse-bar">
@@ -959,9 +963,69 @@ function createIntensityLabel(scaleText, colorStr) {
   return sprite;
 }
 
+// 震度距離円 (Intensity Circles) 描画関数
+function createIntensityCircles(q) {
+  if (!q || !q.earthquake || !q.earthquake.hypocenter) return;
+  const h = q.earthquake.hypocenter;
+  if (h.latitude <= -100 || h.longitude <= -100) return;
+
+  const lat0 = h.latitude;
+  const lon0 = h.longitude;
+  const maxScale = q.earthquake.maxScale || 10;
+  const mag = h.magnitude || 3.0;
+
+  // 各震度階級の目安半径 (km)
+  const scaleCircles = [];
+  if (maxScale >= 60) scaleCircles.push({ scale: 60, radiusKm: Math.min(180, scaleForMagnitude(mag) * 8.5) });
+  if (maxScale >= 50) scaleCircles.push({ scale: 50, radiusKm: Math.min(260, scaleForMagnitude(mag) * 14) });
+  if (maxScale >= 40) scaleCircles.push({ scale: 40, radiusKm: Math.min(360, scaleForMagnitude(mag) * 22) });
+  if (maxScale >= 30) scaleCircles.push({ scale: 30, radiusKm: Math.min(480, scaleForMagnitude(mag) * 32) });
+  if (maxScale >= 10) scaleCircles.push({ scale: 10, radiusKm: Math.min(650, scaleForMagnitude(mag) * 45) });
+
+  const phi0 = lat0 * RAD;
+  const lam0 = lon0 * RAD;
+
+  scaleCircles.forEach(({ scale, radiusKm }) => {
+    const info = getIntensityInfo(scale);
+    const theta = radiusKm / 6371.0; // 地球半径(km)
+
+    const points = [];
+    const steps = 72;
+    for (let i = 0; i <= steps; i++) {
+      const alpha = (i / steps) * Math.PI * 2.0;
+      const sinPhi = Math.sin(phi0) * Math.cos(theta) + Math.cos(phi0) * Math.sin(theta) * Math.cos(alpha);
+      const phi = Math.asin(Math.max(-1.0, Math.min(1.0, sinPhi)));
+      const y = Math.sin(alpha) * Math.sin(theta) * Math.cos(phi0);
+      const x = Math.cos(theta) - Math.sin(phi0) * sinPhi;
+      const lam = lam0 + Math.atan2(y, x);
+
+      const ptLon = lam / RAD;
+      const ptLat = phi / RAD;
+      points.push(geoTo3D(ptLon, ptLat, 0, 0.6));
+    }
+
+    const circleGeo = new THREE.BufferGeometry().setFromPoints(points);
+    const circleMat = new THREE.LineDashedMaterial({
+      color: info.hex,
+      dashSize: 2,
+      gapSize: 1,
+      transparent: true,
+      opacity: 0.75
+    });
+    const circleLine = new THREE.Line(circleGeo, circleMat);
+    circleLine.computeLineDistances();
+    intensityGroup.add(circleLine);
+  });
+}
+
 function showQuakeIntensities(q) {
   intensityGroup.clear();
-  if (!q || !Array.isArray(q.points) || q.points.length === 0) return;
+  if (!q) return;
+
+  // 震度範囲の3D曲面波紋円を描画
+  createIntensityCircles(q);
+
+  if (!Array.isArray(q.points) || q.points.length === 0) return;
 
   // 各都道府県（または観測地点）ごとの最大震度をまとめる
   const prefMaxScale = new Map();
@@ -1265,7 +1329,24 @@ const shockwaveFragmentShader = `
   }
 `;
 
+const pWaveMatTemplate = new THREE.MeshBasicMaterial({
+  color: 0x00e5ff,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.6,
+  depthWrite: false
+});
+
+const sWaveMatTemplate = new THREE.MeshBasicMaterial({
+  color: 0xf59e0b,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.7,
+  depthWrite: false
+});
+
 function createShockwave(pos, color, mag) {
+  // 1. 地表 2D 平面 P/S 波紋
   const planeGeo = new THREE.PlaneGeometry(2.0, 2.0, 1, 1);
   const shaderMat = new THREE.ShaderMaterial({
     vertexShader: shockwaveVertexShader,
@@ -1280,16 +1361,37 @@ function createShockwave(pos, color, mag) {
     depthWrite: false
   });
 
-  const mesh = new THREE.Mesh(planeGeo, shaderMat);
-  mesh.position.copy(pos);
-  mesh.rotation.x = -Math.PI / 2;
-  shockwaveGroup.add(mesh);
+  const planeMesh = new THREE.Mesh(planeGeo, shaderMat);
+  planeMesh.position.copy(pos);
+  planeMesh.rotation.x = -Math.PI / 2;
+  shockwaveGroup.add(planeMesh);
+
+  // 2. 3D 震源 P波 (疎密波: 高速 Vp ≈ 6km/s, シアン) 球面波
+  const pSphereGeo = new THREE.SphereGeometry(1, 16, 12);
+  const pSphereMat = pWaveMatTemplate.clone();
+  const pSphereMesh = new THREE.Mesh(pSphereGeo, pSphereMat);
+  pSphereMesh.position.copy(pos);
+  shockwaveGroup.add(pSphereMesh);
+
+  // 3. 3D 震源 S波 (剪断波: 低速 Vs ≈ 3.5km/s, アンバー) 球面波
+  const sSphereGeo = new THREE.SphereGeometry(1, 16, 12);
+  const sSphereMat = sWaveMatTemplate.clone();
+  const sSphereMesh = new THREE.Mesh(sSphereGeo, sSphereMat);
+  sSphereMesh.position.copy(pos);
+  shockwaveGroup.add(sSphereMesh);
+
+  const maxRadius = Math.max(22, scaleForMagnitude(mag) * 8.5);
 
   shockwaves.push({
-    mesh,
+    planeMesh,
     material: shaderMat,
-    maxRadius: Math.max(18, scaleForMagnitude(mag) * 7),
-    currentRadius: 1,
+    pSphereMesh,
+    pSphereMat,
+    sSphereMesh,
+    sSphereMat,
+    maxRadius,
+    currentRadiusP: 1,
+    currentRadiusS: 0.6,
     opacity: 0.9,
     progress: 0.0
   });
@@ -1298,19 +1400,34 @@ function createShockwave(pos, color, mag) {
 function updateShockwaves(dt) {
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const sw = shockwaves[i];
-    sw.currentRadius += dt * 38.0;
-    sw.opacity -= dt * 0.85;
+    sw.currentRadiusP += dt * 42.0;      // P波伝播速度
+    sw.currentRadiusS += dt * 42.0 / 1.73; // S波伝播速度 (Vp/Vs ≈ 1.73)
+    sw.opacity -= dt * 0.75;
     sw.progress += dt * 3.0;
 
-    if (sw.opacity <= 0 || sw.currentRadius >= sw.maxRadius) {
-      shockwaveGroup.remove(sw.mesh);
-      sw.mesh.geometry.dispose();
+    if (sw.opacity <= 0 || sw.currentRadiusP >= sw.maxRadius) {
+      shockwaveGroup.remove(sw.planeMesh);
+      shockwaveGroup.remove(sw.pSphereMesh);
+      shockwaveGroup.remove(sw.sSphereMesh);
+
+      sw.planeMesh.geometry.dispose();
       sw.material.dispose();
+      sw.pSphereMesh.geometry.dispose();
+      sw.pSphereMat.dispose();
+      sw.sSphereMesh.geometry.dispose();
+      sw.sSphereMat.dispose();
+
       shockwaves.splice(i, 1);
     } else {
-      sw.mesh.scale.setScalar(sw.currentRadius);
+      sw.planeMesh.scale.setScalar(sw.currentRadiusP);
       sw.material.uniforms.uOpacity.value = Math.max(0, sw.opacity);
       sw.material.uniforms.uProgress.value = sw.progress;
+
+      sw.pSphereMesh.scale.setScalar(sw.currentRadiusP);
+      sw.pSphereMat.opacity = Math.max(0, sw.opacity * 0.6);
+
+      sw.sSphereMesh.scale.setScalar(sw.currentRadiusS);
+      sw.sSphereMat.opacity = Math.max(0, sw.opacity * 0.75);
     }
   }
 }
@@ -1444,13 +1561,22 @@ speedSelect.addEventListener('change', (e) => {
   timelapseSpeedMultiplier = parseFloat(e.target.value);
 });
 
+let activeTimelapseQuakeId = null;
+
 function applyTimelapseVisibility() {
   const items = cachedViewItems || viewItems();
   const visibleIds = new Set();
+  let newestActiveQuake = null;
+  let newestTime = -Infinity;
+
   for (let i = 0; i < items.length; i++) {
     const q = items[i];
     if (q._timeMs <= timelapseCurrentTime) {
       visibleIds.add(q.id);
+      if (q._timeMs > newestTime) {
+        newestTime = q._timeMs;
+        newestActiveQuake = q;
+      }
     }
   }
 
@@ -1476,6 +1602,16 @@ function applyTimelapseVisibility() {
       if (mesh.userData) mesh.userData.hasTriggeredShockwave = false;
     }
   });
+
+  // タイムラプス進行に伴い、直近発生した地震の震度表示・震度円を自動更新
+  if (isTimelapsePlaying && newestActiveQuake && newestActiveQuake.id !== activeTimelapseQuakeId) {
+    activeTimelapseQuakeId = newestActiveQuake.id;
+    latestSelectedQuake = newestActiveQuake;
+    showQuakeIntensities(newestActiveQuake);
+    if (stressGroup.visible) {
+      renderStressVectors(newestActiveQuake);
+    }
+  }
 }
 
 function validEarthquake(q){
@@ -2083,6 +2219,44 @@ document.querySelector('#stress-toggle').addEventListener('click', async () => {
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+
+const coordRaycaster = new THREE.Raycaster();
+const coordMouse = new THREE.Vector2();
+const coordHudEl = document.querySelector('#coord-hud');
+
+// 3D ローカル世界座標 (x, y, z) から地理緯度・経度の逆変換
+function threeToGeo(pos) {
+  const x = pos.x;
+  const y = pos.y + R_EARTH;
+  const z = pos.z;
+  const r = Math.hypot(x, y, z);
+
+  const sinPhi = (y * sinLat0 - z * cosLat0) / r;
+  const phi = Math.asin(Math.max(-1.0, Math.min(1.0, sinPhi)));
+  const lat = phi / RAD;
+
+  const sinDLon = x / (r * Math.cos(phi));
+  const dLon = Math.asin(Math.max(-1.0, Math.min(1.0, sinDLon)));
+  const lon = LON0 + dLon / RAD;
+
+  const elev = getElevation(lon, lat);
+  return { lon, lat, elev };
+}
+
+window.addEventListener('mousemove', (event) => {
+  if (!coordHudEl) return;
+  coordMouse.x = (event.clientX / innerWidth) * 2 - 1;
+  coordMouse.y = -(event.clientY / innerHeight) * 2 + 1;
+
+  coordRaycaster.setFromCamera(coordMouse, camera);
+  const intersects = coordRaycaster.intersectObjects(mapGroup.children, true);
+
+  if (intersects.length > 0) {
+    const p3d = intersects[0].point;
+    const geo = threeToGeo(p3d);
+    coordHudEl.textContent = `緯度: ${geo.lat.toFixed(2)}°N / 経度: ${geo.lon.toFixed(2)}°E / 標高: ${Math.round(geo.elev * 150)}m`;
+  }
+});
 
 window.addEventListener('click', async (event) => {
   // HUDやUIエレメント上のクリックは無視
