@@ -199,8 +199,8 @@ body.light-mode #help{color:#64748b}
       <div id="operation-section">
         <div class="menu-section-title">⚙️ レイヤー・操作</div>
         <div class="menu-buttons">
-          <button id="overlay-toggle" class="theme-btn active-blue">🗺️ 2階地図 (震度面)</button>
-          <button id="volcano-toggle" class="theme-btn active-orange">🌋 活火山</button>
+          <button id="overlay-toggle" class="theme-btn">🗺️ 2階地図 (震度面)</button>
+          <button id="volcano-toggle" class="theme-btn">🌋 活火山</button>
           <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
           <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
         </div>
@@ -472,6 +472,7 @@ const mapGroup = new THREE.Group();
 worldGroup.add(mapGroup);
 
 const overlayMapGroup = new THREE.Group();
+overlayMapGroup.visible = false;
 worldGroup.add(overlayMapGroup);
 
 const faultGroup = new THREE.Group();
@@ -1017,6 +1018,7 @@ function createTextSprite(text, color) {
 }
 
 const volcanoGroup = new THREE.Group();
+volcanoGroup.visible = false;
 worldGroup.add(volcanoGroup);
 
 const ACTIVE_VOLCANOES = [
