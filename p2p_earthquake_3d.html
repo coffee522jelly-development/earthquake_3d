@@ -166,6 +166,7 @@ body.light-mode #help{color:#64748b}
         <div class="menu-section-title">⚙️ レイヤー・操作</div>
         <div class="menu-buttons">
           <button id="overlay-toggle" class="theme-btn">🗺️ 2階地図 (震度面)</button>
+          <button id="slab-toggle" class="theme-btn">🌊 プレート深部スラブ</button>
           <button id="volcano-toggle" class="theme-btn">🌋 活火山</button>
           <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
           <button id="stress-toggle" class="theme-btn">↗️ 地盤動揺・応力 (USGS)</button>
@@ -179,6 +180,9 @@ body.light-mode #help{color:#64748b}
             <span style="color:#f59e0b">━</span> Aランク (0.1〜3%: 立川,三浦,跡津川等)<br>
             <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
             <span style="color:#00e5ff">━</span> プレート境界・海溝系
+          </div>
+          <div style="margin-top:4px;font-size:11px;color:#818cf8">
+            🌊 プレート深部スラブ (沈み込み帯 50km~300km等深線)
           </div>
           <div style="margin-top:4px;font-size:11px;color:#38bdf8">
             ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
@@ -379,7 +383,69 @@ function buildCurvedGrid() {
     const geo = new THREE.BufferGeometry().setFromPoints(minorPairs);
     curvedGridGroup.add(new THREE.LineSegments(geo, gridMinorMat));
   }
+
+  // 東西南北 方位指標 (Cardinal Compass Indicators)
+  addCardinalCompassIndicators();
 }
+
+// 東西南北・方位軸 & 中心指標の描画
+function addCardinalCompassIndicators() {
+  const cardinalColor = new THREE.Color(0x00e5ff);
+  const cardinalMat = new THREE.LineDashedMaterial({
+    color: 0x00e5ff,
+    dashSize: 4,
+    gapSize: 3,
+    transparent: true,
+    opacity: 0.75
+  });
+
+  const centerLon = 136.0;
+  const centerLat = 35.0;
+  const cCenter = geoToSeaLevel3D(centerLon, centerLat, 0.5);
+
+  // 1. 北 (N) / 南 (S) / 東 (E) / 西 (W) 方位線と端点ラベル
+  const directions = [
+    { name: '北 (N)', lon: centerLon, lat: 51.5, offset: [0, 8, 0] },
+    { name: '南 (S)', lon: centerLon, lat: 18.5, offset: [0, -8, 0] },
+    { name: '東 (E)', lon: 153.5, lat: centerLat, offset: [10, 0, 0] },
+    { name: '西 (W)', lon: 118.5, lat: centerLat, offset: [-10, 0, 0] }
+  ];
+
+  directions.forEach(dir => {
+    const linePts = interpolateSeaLevelLine([[centerLon, centerLat], [dir.lon, dir.lat]], 0.05, 0.5);
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+    const lineMesh = new THREE.Line(lineGeo, cardinalMat);
+    lineMesh.computeLineDistances();
+    curvedGridGroup.add(lineMesh);
+
+    const endPos = geoToSeaLevel3D(dir.lon, dir.lat, 1.0);
+    const label = createTextSprite(dir.name, cardinalColor);
+    label.position.copy(endPos).add(new THREE.Vector3(...dir.offset));
+    curvedGridGroup.add(label);
+  });
+
+  // 2. 日本列島中心（明石・東経135度付近）を通る垂直地軸 (Geographic Earth Axis Pole)
+  const axisTop = geoToSeaLevel3D(centerLon, centerLat, 40.0);
+  const axisBottom = geoTo3D(centerLon, centerLat, 300);
+
+  const axisGeo = new THREE.BufferGeometry().setFromPoints([axisTop, axisBottom]);
+  const axisLineMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.7 });
+  curvedGridGroup.add(new THREE.Line(axisGeo, axisLineMat));
+
+  // 中心軸標識リング
+  const ringGeo = new THREE.RingGeometry(8, 9.5, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.position.copy(cCenter);
+  ringMesh.rotation.x = -Math.PI / 2;
+  curvedGridGroup.add(ringMesh);
+
+  // 中心軸ラベル
+  const centerLabel = createTextSprite('地軸 Center (136°E, 35°N)', cardinalColor);
+  centerLabel.position.copy(axisTop).add(new THREE.Vector3(0, 10, 0));
+  curvedGridGroup.add(centerLabel);
+}
+
 buildCurvedGrid();
 
 // 海面指定高度 (offset) に沿って細分化補間するライン
@@ -437,6 +503,10 @@ worldGroup.add(overlayMapGroup);
 
 const faultGroup = new THREE.Group();
 worldGroup.add(faultGroup);
+
+const slabGroup = new THREE.Group();
+worldGroup.add(slabGroup);
+slabGroup.visible = false;
 
 const jshisGroup = new THREE.Group();
 worldGroup.add(jshisGroup);
@@ -836,11 +906,173 @@ function addFaults() {
   });
 }
 
+// ----------------------------------------------------
+// プレート深部スラブ・沈み込み帯 3D立体構造 (Subducting Plate Slabs)
+// ----------------------------------------------------
+const slabShaderMaterials = [];
+
+const slabVertexShader = `
+  varying vec2 vUv;
+  varying float vDepth;
+  varying vec3 vWorldPosition;
+  attribute float depth;
+  void main() {
+    vUv = uv;
+    vDepth = depth;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPos.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const slabFragmentShader = `
+  uniform float uTime;
+  varying vec2 vUv;
+  varying float vDepth;
+  varying vec3 vWorldPosition;
+
+  void main() {
+    // 深度(0km ~ 300km) に応じたグラデーション: 浅(シアン) -> 中(青) -> 深(紫・インディゴ)
+    float normDepth = clamp(vDepth / 300.0, 0.0, 1.0);
+    vec3 shallowColor = vec3(0.0, 0.9, 1.0);  // 0km - 50km
+    vec3 midColor     = vec3(0.1, 0.4, 0.95); // 100km - 150km
+    vec3 deepColor    = vec3(0.5, 0.1, 0.85); // 200km - 300km
+
+    vec3 baseColor = normDepth < 0.5 ? mix(shallowColor, midColor, normDepth * 2.0) : mix(midColor, deepColor, (normDepth - 0.5) * 2.0);
+
+    // 等深線 (Iso-depth contour lines: 50km間隔)
+    float contour = abs(sin(vDepth * 0.0628318));
+    float contourGlow = smoothstep(0.12, 0.0, contour) * 0.65;
+
+    // スラブに沿った微細な沈み込み流れパルス
+    float flowPulse = sin(vUv.y * 35.0 - uTime * 2.5) * 0.5 + 0.5;
+    flowPulse = pow(flowPulse, 4.0) * 0.3;
+
+    vec3 finalColor = baseColor + vec3(contourGlow) + vec3(flowPulse * 0.5);
+    float alpha = 0.50 + contourGlow * 0.35;
+
+    gl_FragColor = vec4(finalColor, alpha);
+  }
+`;
+
+const SUBDUCTING_SLABS = [
+  // 1. 太平洋プレートスラブ (Pacific Plate Slab): 日本海溝・千島海溝から西北西(WNW)へ沈み込み (0km -> 100km -> 200km -> 300km)
+  {
+    name: '太平洋プレート沈み込みスラブ',
+    trenchCoords: [[147.0, 43.5], [145.2, 42.0], [144.6, 40.5], [143.8, 38.5], [142.5, 36.5], [141.2, 34.5]],
+    dipVector: [-5.0, 1.2], // 西北西方向への傾斜ベクトル (lonShift, latShift)
+    depthProfiles: [0, 60, 150, 280] // 各並行列の深さ (km)
+  },
+  // 2. フィリピン海プレートスラブ (Philippine Sea Plate Slab): 南海トラフ・相模トラフから北西(NW)へ沈み込み (0km -> 40km -> 90km -> 150km)
+  {
+    name: 'フィリピン海プレート沈み込みスラブ',
+    trenchCoords: [[139.6, 34.9], [138.0, 34.0], [136.0, 33.2], [134.0, 32.5], [132.0, 31.5], [130.5, 30.5]],
+    dipVector: [-3.5, 3.2], // 北西方向への傾斜ベクトル (lonShift, latShift)
+    depthProfiles: [0, 40, 85, 140]
+  }
+];
+
+function initSubductingSlabs() {
+  SUBDUCTING_SLABS.forEach(slab => {
+    const trench = slab.trenchCoords;
+    const dip = slab.dipVector;
+    const depths = slab.depthProfiles;
+
+    const rows = depths.length;
+    const cols = trench.length;
+
+    const positions = [];
+    const uvs = [];
+    const depthAttrs = [];
+    const indices = [];
+
+    for (let r = 0; r < rows; r++) {
+      const depthKm = depths[r];
+      const shiftRatio = r / (rows - 1);
+
+      for (let c = 0; c < cols; c++) {
+        const baseLon = trench[c][0];
+        const baseLat = trench[c][1];
+
+        const lon = baseLon + dip[0] * shiftRatio;
+        const lat = baseLat + dip[1] * shiftRatio;
+
+        const p3d = geoTo3D(lon, lat, depthKm);
+
+        positions.push(p3d.x, p3d.y, p3d.z);
+        uvs.push(c / (cols - 1), shiftRatio);
+        depthAttrs.push(depthKm);
+
+        if (r < rows - 1 && c < cols - 1) {
+          const curr = r * cols + c;
+          const next = (r + 1) * cols + c;
+
+          indices.push(curr, next, curr + 1);
+          indices.push(curr + 1, next, next + 1);
+        }
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setAttribute('depth', new THREE.Float32BufferAttribute(depthAttrs, 1));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: slabVertexShader,
+      fragmentShader: slabFragmentShader,
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthWrite: false
+    });
+
+    slabShaderMaterials.push(mat);
+
+    const slabMesh = new THREE.Mesh(geo, mat);
+    slabGroup.add(slabMesh);
+
+    // 等深線 50km, 100km, 200km ガイド描画 (Wireframe contour lines)
+    for (let r = 0; r < rows; r++) {
+      const contourPts = [];
+      for (let c = 0; c < cols; c++) {
+        const baseLon = trench[c][0];
+        const baseLat = trench[c][1];
+        const shiftRatio = r / (rows - 1);
+        const lon = baseLon + dip[0] * shiftRatio;
+        const lat = baseLat + dip[1] * shiftRatio;
+        contourPts.push(geoTo3D(lon, lat, depths[r]));
+      }
+      const contourGeo = new THREE.BufferGeometry().setFromPoints(contourPts);
+      const contourMat = new THREE.LineBasicMaterial({
+        color: getDepthColor(depths[r]),
+        transparent: true,
+        opacity: 0.8
+      });
+      slabGroup.add(new THREE.Line(contourGeo, contourMat));
+
+      // 等深線テキストラベル ("100km", "200km")
+      if (contourPts.length > 0 && depths[r] > 0) {
+        const midIdx = Math.floor(contourPts.length / 2);
+        const labelPos = contourPts[midIdx];
+        const label = createTextSprite(`${slab.name} (${depths[r]}km面)`, getDepthColor(depths[r]));
+        label.position.copy(labelPos).add(new THREE.Vector3(0, 5, 0));
+        slabGroup.add(label);
+      }
+    }
+  });
+}
+
 async function loadMap(){
   const r=await fetch(GEOJSON_URL);
   if(!r.ok) throw new Error('日本地図の取得に失敗');
   addGeoJSON(await r.json());
   addFaults();
+  initSubductingSlabs();
 }
 
 // 地震 & 震度表示
@@ -1143,6 +1375,12 @@ document.querySelector('#overlay-toggle').addEventListener('click', () => {
   overlayMapGroup.visible = !overlayMapGroup.visible;
   const btn = document.querySelector('#overlay-toggle');
   btn.classList.toggle('active-blue', overlayMapGroup.visible);
+});
+
+document.querySelector('#slab-toggle').addEventListener('click', () => {
+  slabGroup.visible = !slabGroup.visible;
+  const btn = document.querySelector('#slab-toggle');
+  btn.classList.toggle('active-blue', slabGroup.visible);
 });
 
 document.querySelector('#volcano-toggle').addEventListener('click', () => {
@@ -2147,6 +2385,9 @@ function animate(){
   const elapsedTime = clock.getElapsedTime();
   for (let i = 0; i < faultShaderMaterials.length; i++) {
     faultShaderMaterials[i].uniforms.uTime.value = elapsedTime;
+  }
+  for (let i = 0; i < slabShaderMaterials.length; i++) {
+    slabShaderMaterials[i].uniforms.uTime.value = elapsedTime;
   }
 
   updateShockwaves(dt);
