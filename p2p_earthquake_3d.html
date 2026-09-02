@@ -1001,7 +1001,7 @@ function createIntensityCircles(q) {
 
       const ptLon = lam / RAD;
       const ptLat = phi / RAD;
-      points.push(geoTo3D(ptLon, ptLat, 0, 0.6));
+      points.push(geoToSeaLevel3D(ptLon, ptLat, 0.6));
     }
 
     const circleGeo = new THREE.BufferGeometry().setFromPoints(points);
@@ -1346,7 +1346,7 @@ const sWaveMatTemplate = new THREE.MeshBasicMaterial({
 });
 
 function createShockwave(pos, color, mag) {
-  // 1. 地表 2D 平面 P/S 波紋
+  // 地表 2D 平面 P/S 波紋 (標高を反映しない平面波)
   const planeGeo = new THREE.PlaneGeometry(2.0, 2.0, 1, 1);
   const shaderMat = new THREE.ShaderMaterial({
     vertexShader: shockwaveVertexShader,
@@ -1362,36 +1362,17 @@ function createShockwave(pos, color, mag) {
   });
 
   const planeMesh = new THREE.Mesh(planeGeo, shaderMat);
-  planeMesh.position.copy(pos);
+  planeMesh.position.set(pos.x, 0.5, pos.z);
   planeMesh.rotation.x = -Math.PI / 2;
   shockwaveGroup.add(planeMesh);
-
-  // 2. 3D 震源 P波 (疎密波: 高速 Vp ≈ 6km/s, シアン) 球面波
-  const pSphereGeo = new THREE.SphereGeometry(1, 16, 12);
-  const pSphereMat = pWaveMatTemplate.clone();
-  const pSphereMesh = new THREE.Mesh(pSphereGeo, pSphereMat);
-  pSphereMesh.position.copy(pos);
-  shockwaveGroup.add(pSphereMesh);
-
-  // 3. 3D 震源 S波 (剪断波: 低速 Vs ≈ 3.5km/s, アンバー) 球面波
-  const sSphereGeo = new THREE.SphereGeometry(1, 16, 12);
-  const sSphereMat = sWaveMatTemplate.clone();
-  const sSphereMesh = new THREE.Mesh(sSphereGeo, sSphereMat);
-  sSphereMesh.position.copy(pos);
-  shockwaveGroup.add(sSphereMesh);
 
   const maxRadius = Math.max(22, scaleForMagnitude(mag) * 8.5);
 
   shockwaves.push({
     planeMesh,
     material: shaderMat,
-    pSphereMesh,
-    pSphereMat,
-    sSphereMesh,
-    sSphereMat,
     maxRadius,
     currentRadiusP: 1,
-    currentRadiusS: 0.6,
     opacity: 0.9,
     progress: 0.0
   });
@@ -1401,33 +1382,18 @@ function updateShockwaves(dt) {
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const sw = shockwaves[i];
     sw.currentRadiusP += dt * 42.0;      // P波伝播速度
-    sw.currentRadiusS += dt * 42.0 / 1.73; // S波伝播速度 (Vp/Vs ≈ 1.73)
     sw.opacity -= dt * 0.75;
     sw.progress += dt * 3.0;
 
     if (sw.opacity <= 0 || sw.currentRadiusP >= sw.maxRadius) {
       shockwaveGroup.remove(sw.planeMesh);
-      shockwaveGroup.remove(sw.pSphereMesh);
-      shockwaveGroup.remove(sw.sSphereMesh);
-
       sw.planeMesh.geometry.dispose();
       sw.material.dispose();
-      sw.pSphereMesh.geometry.dispose();
-      sw.pSphereMat.dispose();
-      sw.sSphereMesh.geometry.dispose();
-      sw.sSphereMat.dispose();
-
       shockwaves.splice(i, 1);
     } else {
       sw.planeMesh.scale.setScalar(sw.currentRadiusP);
       sw.material.uniforms.uOpacity.value = Math.max(0, sw.opacity);
       sw.material.uniforms.uProgress.value = sw.progress;
-
-      sw.pSphereMesh.scale.setScalar(sw.currentRadiusP);
-      sw.pSphereMat.opacity = Math.max(0, sw.opacity * 0.6);
-
-      sw.sSphereMesh.scale.setScalar(sw.currentRadiusS);
-      sw.sSphereMat.opacity = Math.max(0, sw.opacity * 0.75);
     }
   }
 }
@@ -1545,8 +1511,17 @@ const speedSelect = document.querySelector('#tl-speed');
 playBtn.addEventListener('click', () => {
   isTimelapsePlaying = !isTimelapsePlaying;
   playBtn.textContent = isTimelapsePlaying ? '⏸ 一時停止' : '▶ タイムラプス再生';
-  if (isTimelapsePlaying && timelapseCurrentTime >= timelapseEndTime) {
-    timelapseCurrentTime = timelapseStartTime;
+  if (isTimelapsePlaying) {
+    if (timelapseCurrentTime >= timelapseEndTime) {
+      timelapseCurrentTime = timelapseStartTime;
+    }
+    // タイムラプス再生開始時に今表示中の震度・震度円をクリアしてリセット
+    intensityGroup.clear();
+    activeTimelapseQuakeId = null;
+    quakeMeshes.forEach(({mesh}) => {
+      if (mesh.userData) mesh.userData.hasTriggeredShockwave = false;
+    });
+    applyTimelapseVisibility();
   }
 });
 
