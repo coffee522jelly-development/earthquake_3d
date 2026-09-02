@@ -48,13 +48,18 @@ h1{font-size:14px;margin:0;letter-spacing:0.04em}
 .tab{border:1px solid #233446;background:linear-gradient(180deg, #131d2a 0%, #0b1118 100%);color:#809ab0;border-radius:0;padding:5px 4px;cursor:pointer;font-size:11px;font-family:inherit;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
 .tab:hover{background:linear-gradient(180deg, #1b2a3d 0%, #101822 100%);color:#c5d2dc}
 .tab.active{background:linear-gradient(180deg, rgba(14,116,144,0.35) 0%, rgba(12,19,28,0.95) 100%);color:#00e5ff;border-color:#00e5ff;font-weight:700;box-shadow:inset 0 1px 0 rgba(0,229,255,0.4), 0 0 8px rgba(0,229,255,0.2);text-shadow:0 0 4px rgba(0,229,255,0.5)}
+/* Custom ultra-thin sleek scrollbar styles */
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:rgba(9,14,21,0.5)}
+::-webkit-scrollbar-thumb{background:rgba(0,229,255,0.3);border-radius:3px;transition:background 0.2s}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,229,255,0.8);box-shadow:0 0 6px rgba(0,229,255,0.6)}
+*{scrollbar-width:thin;scrollbar-color:rgba(0,229,255,0.3) rgba(9,14,21,0.5)}
+
 #list{margin-top:8px;max-height:260px;overflow-y:auto;border-top:1px solid #1c2b3a}
-#list::-webkit-scrollbar{width:4px}
-#list::-webkit-scrollbar-track{background:#090e15}
-#list::-webkit-scrollbar-thumb{background:#233446;border-radius:0}
-#list::-webkit-scrollbar-thumb:hover{background:#3b526b}
-body.light-mode #list::-webkit-scrollbar-thumb{background:#cbd5e1}
-body.light-mode #list::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+body.light-mode ::-webkit-scrollbar-track{background:rgba(241,245,249,0.6)}
+body.light-mode ::-webkit-scrollbar-thumb{background:rgba(2,132,199,0.3)}
+body.light-mode ::-webkit-scrollbar-thumb:hover{background:rgba(2,132,199,0.8)}
+body.light-mode *{scrollbar-color:rgba(2,132,199,0.3) rgba(241,245,249,0.6)}
 .quake-row{padding:6px 4px;border-bottom:1px solid #1c2b3a;cursor:pointer}
 .quake-row:hover{background:#111c29}
 .quake-title{font-weight:700;font-size:11px;letter-spacing:0.02em}
@@ -204,6 +209,7 @@ body.light-mode #help{color:#64748b}
           <button id="overlay-toggle" class="theme-btn">🗺️ 2階地図 (震度面)</button>
           <button id="volcano-toggle" class="theme-btn">🌋 活火山</button>
           <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
+          <button id="stress-toggle" class="theme-btn">↗️ 地盤動揺・応力 (USGS)</button>
           <button id="theme-toggle" class="theme-btn">☀️ ライトモード</button>
         </div>
         <div id="legend" style="margin-top:6px">
@@ -220,6 +226,9 @@ body.light-mode #help{color:#64748b}
           </div>
           <div style="margin-top:4px;font-size:11px;color:#f97316">
             ▲ 活火山・噴火警戒レベル (Lv1:緑 ~ Lv5:紫)
+          </div>
+          <div style="margin-top:4px;font-size:11px;color:#f59e0b">
+            ↗ プレート運動 & 震源応力 (P軸:圧縮/赤 ⇄ T軸:引張/青)
           </div>
         </div>
       </div>
@@ -483,6 +492,12 @@ worldGroup.add(faultGroup);
 const jshisGroup = new THREE.Group();
 worldGroup.add(jshisGroup);
 jshisGroup.visible = false;
+
+const stressGroup = new THREE.Group();
+worldGroup.add(stressGroup);
+stressGroup.visible = false;
+
+let latestSelectedQuake = null;
 
 let mapLineMat, mapFillMat, faultLineMat, overlayFillMat, overlayLineMat;
 
@@ -1570,12 +1585,16 @@ function renderDashboard(){
       `<div class="quake-title"><span class="badge ${badgeClass}">${magnitude(q)}</span>${intensityBadge}${h.name||'震源不明'}</div>`+
       `<div class="quake-meta">${formatTime(q)}　${maxScaleText}　深さ ${h.depth} km</div>`+
       `<div class="quake-meta" style="font-size:10px;opacity:0.85">津波: ${tsunamiStr}　観測 ${pointCount}地点　緯度 ${h.latitude.toFixed(2)} / 経度 ${h.longitude.toFixed(2)}</div>`;
-    row.onclick=()=>{
+    row.onclick= async ()=>{
+      latestSelectedQuake = q;
       // 全画面モード中に地震を選択した場合、3Dビューワーが見えるよう通常表示に戻す
       if (menuPanel && menuPanel.classList.contains('fullscreen')) {
         setHudFullscreen(false);
       }
       showQuakeIntensities(q);
+      if (stressGroup.visible) {
+        await renderStressVectors(q);
+      }
       const entry=quakeMeshes.get(q.id);
       if(entry && entry.mesh){
         focusOnQuake(q, entry.mesh);
@@ -1810,10 +1829,262 @@ document.querySelector('#jshis-toggle').addEventListener('click', async () => {
   }
 });
 
+// ----------------------------------------------------
+// 地盤動揺・応力ベクトル (USGS Focal Mechanism & Plate Motion)
+// ----------------------------------------------------
+const stressCache = new Map();
+
+// 3D 矢印 ＆ ラベル描画ユーティリティ
+function create3DArrow(origin, dir, length, hexColor, labelText = null, isDouble = false) {
+  const arrowGroup = new THREE.Group();
+  const normalizeDir = dir.clone().normalize();
+
+  // 矢印軸 (Cylinder)
+  const shaftLength = length * 0.75;
+  const headLength = length * 0.25;
+  const headWidth = Math.max(1.5, length * 0.12);
+  const shaftRadius = headWidth * 0.35;
+
+  const arrowMat = new THREE.MeshStandardMaterial({
+    color: hexColor,
+    roughness: 0.3,
+    metalness: 0.2,
+    emissive: hexColor,
+    emissiveIntensity: 0.4
+  });
+
+  // Shaft geometry
+  const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
+  shaftGeo.translate(0, shaftLength / 2, 0);
+  const shaftMesh = new THREE.Mesh(shaftGeo, arrowMat);
+
+  // Head geometry
+  const headGeo = new THREE.ConeGeometry(headWidth, headLength, 12);
+  headGeo.translate(0, shaftLength + headLength / 2, 0);
+  const headMesh = new THREE.Mesh(headGeo, arrowMat);
+
+  const singleArrow = new THREE.Group();
+  singleArrow.add(shaftMesh);
+  singleArrow.add(headMesh);
+
+  // Orient single arrow along dir
+  const defaultDir = new THREE.Vector3(0, 1, 0);
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(defaultDir, normalizeDir);
+  singleArrow.quaternion.copy(quaternion);
+  singleArrow.position.copy(origin);
+
+  arrowGroup.add(singleArrow);
+
+  // 双方向矢印 (P軸 / T軸 応力ペア用)
+  if (isDouble) {
+    const oppositeArrow = singleArrow.clone();
+    oppositeArrow.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(defaultDir, normalizeDir.clone().negate()));
+    arrowGroup.add(oppositeArrow);
+  }
+
+  // 3D キャンバスラベル
+  if (labelText) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.font = 'Bold 22px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const colorStr = '#' + new THREE.Color(hexColor).getHexString();
+    ctx.strokeStyle = 'rgba(5, 12, 18, 0.9)';
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(labelText, canvas.width / 2, canvas.height / 2);
+
+    ctx.fillStyle = colorStr;
+    ctx.fillText(labelText, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(32, 6.4, 1);
+
+    const labelOffset = normalizeDir.clone().multiplyScalar(length + 8);
+    sprite.position.copy(origin).add(labelOffset);
+    arrowGroup.add(sprite);
+  }
+
+  return arrowGroup;
+}
+
+// 太平洋プレート・フィリピン海プレート運動ベクトル定数
+const PLATE_MOTIONS = [
+  // 太平洋プレート (西北西へ約8cm/年)
+  { name: '太平洋プレート ↖ 8.0 cm/yr', lon: 144.5, lat: 38.5, azimuth: 290, speed: 8.0, color: 0x00e5ff },
+  { name: '太平洋プレート ↖ 8.2 cm/yr', lon: 142.5, lat: 35.5, azimuth: 292, speed: 8.2, color: 0x00e5ff },
+  { name: '太平洋プレート ↖ 7.8 cm/yr', lon: 146.0, lat: 42.0, azimuth: 288, speed: 7.8, color: 0x00e5ff },
+
+  // フィリピン海プレート (北西へ約4.5cm/年)
+  { name: 'フィリピン海プレート ↖ 4.5 cm/yr', lon: 136.5, lat: 31.5, azimuth: 310, speed: 4.5, color: 0xf59e0b },
+  { name: 'フィリピン海プレート ↖ 4.2 cm/yr', lon: 131.5, lat: 28.5, azimuth: 315, speed: 4.2, color: 0xf59e0b },
+  { name: 'フィリピン海プレート ↖ 4.8 cm/yr', lon: 139.5, lat: 33.0, azimuth: 305, speed: 4.8, color: 0xf59e0b }
+];
+
+// 方位角(azimuth: 0=N, 90=E) & 傾斜角(plunge: 0=Horiz, 90=Down) から3Dローカル単位方向ベクトルへの変換
+function getDirectionVector(lon, lat, depth, azimuthDeg, plungeDeg = 0) {
+  const pCenter = geoTo3D(lon, lat, depth);
+  const earthCenter = new THREE.Vector3(0, -R_EARTH, 0);
+
+  // Up (鉛直上向き)
+  const up = pCenter.clone().sub(earthCenter).normalize();
+
+  // East (東向き)
+  const pEast = geoTo3D(lon + 0.02, lat, depth);
+  const east = pEast.clone().sub(pCenter).normalize();
+
+  // North (北向き)
+  const north = up.clone().cross(east).normalize();
+
+  const azRad = azimuthDeg * RAD;
+  const plRad = plungeDeg * RAD;
+
+  const cosPl = Math.cos(plRad);
+  const sinPl = Math.sin(plRad);
+
+  // dir = cos(pl) * (cos(az)*North + sin(az)*East) - sin(pl)*Up
+  const dir = new THREE.Vector3()
+    .addScaledVector(north, Math.cos(azRad) * cosPl)
+    .addScaledVector(east, Math.sin(azRad) * cosPl)
+    .addScaledVector(up, -sinPl)
+    .normalize();
+
+  return { origin: pCenter, dir };
+}
+
+// USGS API から特定地震のメカニズム解 (P軸 / T軸 応力方位) を取得
+async function fetchUSGSStressData(q) {
+  if (!q || !q.earthquake || !q.earthquake.hypocenter) return null;
+
+  const id = q.id;
+  if (stressCache.has(id)) return stressCache.get(id);
+
+  const h = q.earthquake.hypocenter;
+  const time = new Date(q.earthquake.time);
+  const startTime = new Date(time.getTime() - 1000 * 3600 * 2).toISOString();
+  const endTime = new Date(time.getTime() + 1000 * 3600 * 2).toISOString();
+
+  const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson` +
+    `&starttime=${startTime}&endtime=${endTime}` +
+    `&minlatitude=${(h.latitude - 1.0).toFixed(2)}&maxlatitude=${(h.latitude + 1.0).toFixed(2)}` +
+    `&minlongitude=${(h.longitude - 1.0).toFixed(2)}&maxlongitude=${(h.longitude + 1.0).toFixed(2)}` +
+    `&minmagnitude=${Math.max(2.0, (h.magnitude || 3.0) - 1.2).toFixed(1)}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('USGS fetch failed');
+    const data = await res.json();
+
+    if (data.features && data.features.length > 0) {
+      // 発生時刻が最も近いUSGSイベントを選択
+      let bestFeat = null;
+      let minDiff = Infinity;
+      data.features.forEach(f => {
+        const diff = Math.abs(f.properties.time - time.getTime());
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestFeat = f;
+        }
+      });
+
+      if (bestFeat) {
+        // 詳細イベントURLの取得
+        const detailRes = await fetch(bestFeat.properties.detail);
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          const mtProduct = detailData.properties?.products?.['moment-tensor']?.[0] ||
+                            detailData.properties?.products?.['focal-mechanism']?.[0];
+
+          if (mtProduct && mtProduct.properties) {
+            const props = mtProduct.properties;
+            const pAz = parseFloat(props['p-axis-azimuth'] || props['nodal-plane-1-strike']);
+            const pPl = parseFloat(props['p-axis-plunge'] || '0');
+            const tAz = parseFloat(props['t-axis-azimuth'] || ((pAz + 90) % 360));
+            const tPl = parseFloat(props['t-axis-plunge'] || '0');
+
+            if (!isNaN(pAz)) {
+              const result = { pAz, pPl, tAz, tPl, source: 'USGS Moment Tensor' };
+              stressCache.set(id, result);
+              return result;
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('USGS stress fetch notice:', e.message);
+  }
+
+  // USGSデータ未対応時の地学モデル推計（太平洋/フィリピン海沈み込み帯 圧縮主応力）
+  const estimatedPAz = h.longitude > 138 ? 275 : 295; // 東日本: WNW-ESE, 西日本: W-E
+  const estimatedResult = {
+    pAz: estimatedPAz,
+    pPl: 10,
+    tAz: (estimatedPAz + 90) % 360,
+    tPl: 70,
+    source: '広域応力推計モデル'
+  };
+  stressCache.set(id, estimatedResult);
+  return estimatedResult;
+}
+
+// プレート運動 & 震源応力ベクトルの総合レンダリング
+async function renderStressVectors(q) {
+  stressGroup.clear();
+
+  // 1. 広域プレート運動ベクトルの描画 (海面上)
+  PLATE_MOTIONS.forEach(p => {
+    const { origin, dir } = getDirectionVector(p.lon, p.lat, 0, p.azimuth, 0);
+    const arrowLen = p.speed * 4.5;
+    const arrowMesh = create3DArrow(origin, dir, arrowLen, p.color, p.name, false);
+    stressGroup.add(arrowMesh);
+  });
+
+  // 2. 選択中地震の震源応力ベクトル (P軸 圧縮力 / T軸 引張り力)
+  if (q && q.earthquake && q.earthquake.hypocenter) {
+    const h = q.earthquake.hypocenter;
+    const stressData = await fetchUSGSStressData(q);
+
+    if (stressData) {
+      const pVector = getDirectionVector(h.longitude, h.latitude, h.depth, stressData.pAz, stressData.pPl);
+      const tVector = getDirectionVector(h.longitude, h.latitude, h.depth, stressData.tAz, stressData.tPl);
+
+      const vecLength = Math.max(22, scaleForMagnitude(h.magnitude) * 3.5);
+
+      // P軸 (圧縮応力: 赤)
+      const pLabel = `P軸(圧縮): N${Math.round(stressData.pAz)}°E [${stressData.source}]`;
+      const pArrow = create3DArrow(pVector.origin, pVector.dir, vecLength, 0xef4444, pLabel, true);
+      stressGroup.add(pArrow);
+
+      // T軸 (引張応力: シアン/青)
+      const tLabel = `T軸(引張): N${Math.round(stressData.tAz)}°E`;
+      const tArrow = create3DArrow(tVector.origin, tVector.dir, vecLength, 0x00e5ff, tLabel, true);
+      stressGroup.add(tArrow);
+    }
+  }
+}
+
+document.querySelector('#stress-toggle').addEventListener('click', async () => {
+  stressGroup.visible = !stressGroup.visible;
+  const btn = document.querySelector('#stress-toggle');
+  btn.classList.toggle('active-orange', stressGroup.visible);
+
+  if (stressGroup.visible) {
+    const targetQ = latestSelectedQuake || earthquakes[0];
+    await renderStressVectors(targetQ);
+  }
+});
+
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-window.addEventListener('click', (event) => {
+window.addEventListener('click', async (event) => {
   // HUDやUIエレメント上のクリックは無視
   if (event.target.closest('#timelapse-bar, #top-left, #hud-section, #VRButton')) return;
 
@@ -1826,7 +2097,11 @@ window.addEventListener('click', (event) => {
   if (intersects.length > 0) {
     const hitObj = intersects[0].object;
     if (hitObj.userData && hitObj.userData.q) {
+      latestSelectedQuake = hitObj.userData.q;
       showQuakeIntensities(hitObj.userData.q);
+      if (stressGroup.visible) {
+        await renderStressVectors(hitObj.userData.q);
+      }
       focusOnQuake(hitObj.userData.q, hitObj);
     }
   }
