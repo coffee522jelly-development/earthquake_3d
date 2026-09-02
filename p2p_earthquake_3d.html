@@ -22,17 +22,17 @@ canvas{display:block}
 .menu-section-title{font-size:12px;font-weight:700;letter-spacing:0.06em;color:#00e5ff;margin:0 0 4px;padding-bottom:4px;border-bottom:1px solid #233446;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase}
 
 .menu-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.theme-btn{background:#111b27;border:1px solid #233446;border-radius:0;color:#c5d2dc;padding:7px 10px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-align:left;letter-spacing:0.02em}
-.theme-btn:hover{background:#182637;border-color:#3b526b;color:#ffffff}
-.theme-btn.active-blue{background:#0284c7 !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700;box-shadow:0 0 8px rgba(0,229,255,0.25)}
-.theme-btn.active-orange{background:#b45309 !important;border-color:#f59e0b !important;color:#ffffff !important;font-weight:700;box-shadow:0 0 8px rgba(245,158,11,0.25)}
+.theme-btn{background:linear-gradient(180deg, #162230 0%, #0c131c 100%);border:1px solid #283d52;border-radius:0;color:#c5d2dc;padding:7px 10px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-align:left;letter-spacing:0.02em;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.3)}
+.theme-btn:hover{background:linear-gradient(180deg, #1f3044 0%, #111a26 100%);border-color:#3e5b7a;color:#ffffff;box-shadow:inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.4)}
+.theme-btn.active-blue{background:linear-gradient(180deg, rgba(14,116,144,0.85) 0%, rgba(3,105,161,0.95) 100%) !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(0,229,255,0.35) !important;text-shadow:0 0 4px rgba(0,229,255,0.6)}
+.theme-btn.active-orange{background:linear-gradient(180deg, rgba(180,83,9,0.85) 0%, rgba(146,64,14,0.95) 100%) !important;border-color:#f59e0b !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(245,158,11,0.35) !important;text-shadow:0 0 4px rgba(245,158,11,0.6)}
 #legend{background:#090e15;border:1px solid #1c2b3a;border-radius:0;padding:8px 10px;font-size:11px;line-height:1.45}
 #help{position:absolute;left:14px;bottom:12px;z-index:5;color:#5c7388;font-size:11px;font-family:inherit}
 
 /* CAD Technical Timelapse Control Bar */
 #timelapse-bar{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);z-index:10;background:#0c131c;border:1px solid #233446;border-radius:0;padding:8px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 0 0 1px #000000;min-width:520px;max-width:calc(100vw - 32px)}
-#tl-play{background:#0284c7;border:1px solid #00e5ff;color:#fff;border-radius:0;padding:5px 12px;font-weight:700;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-transform:uppercase}
-#tl-play:hover{background:#0369a1}
+#tl-play{background:linear-gradient(180deg, rgba(14,116,144,0.9) 0%, rgba(3,105,161,0.95) 100%);border:1px solid #00e5ff;color:#fff;border-radius:0;padding:5px 12px;font-weight:700;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;text-transform:uppercase;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 10px rgba(0,229,255,0.3);text-shadow:0 0 4px rgba(0,229,255,0.6)}
+#tl-play:hover{background:linear-gradient(180deg, rgba(2,132,199,0.95) 0%, rgba(3,105,161,1) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,0.4), 0 0 14px rgba(0,229,255,0.5)}
 #tl-slider{flex:1;height:4px;accent-color:#00e5ff;cursor:pointer;border-radius:0}
 #tl-speed{background:#090e15;border:1px solid #233446;color:#c5d2dc;border-radius:0;padding:3px 6px;font-size:11px;font-family:inherit;cursor:pointer}
 #tl-date{font-size:11px;font-family:inherit;color:#00e5ff;min-width:140px;text-align:right;font-weight:600}
@@ -45,9 +45,9 @@ h1{font-size:14px;margin:0;letter-spacing:0.04em}
 #latest{font-size:12px;line-height:1.5}
 #summary{font-size:11px;color:#809ab0;margin:6px 0}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:8px 0}
-.tab{border:1px solid #233446;background:#0f1722;color:#809ab0;border-radius:0;padding:5px 4px;cursor:pointer;font-size:11px;font-family:inherit;text-align:center}
-.tab:hover{background:#182637;color:#c5d2dc}
-.tab.active{background:#1e2d3d;color:#00e5ff;border-color:#00e5ff;font-weight:700}
+.tab{border:1px solid #233446;background:linear-gradient(180deg, #131d2a 0%, #0b1118 100%);color:#809ab0;border-radius:0;padding:5px 4px;cursor:pointer;font-size:11px;font-family:inherit;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.tab:hover{background:linear-gradient(180deg, #1b2a3d 0%, #101822 100%);color:#c5d2dc}
+.tab.active{background:linear-gradient(180deg, rgba(14,116,144,0.35) 0%, rgba(12,19,28,0.95) 100%);color:#00e5ff;border-color:#00e5ff;font-weight:700;box-shadow:inset 0 1px 0 rgba(0,229,255,0.4), 0 0 8px rgba(0,229,255,0.2);text-shadow:0 0 4px rgba(0,229,255,0.5)}
 #list{margin-top:8px;max-height:260px;overflow-y:auto;border-top:1px solid #1c2b3a}
 #list::-webkit-scrollbar{width:4px}
 #list::-webkit-scrollbar-track{background:#090e15}
@@ -82,8 +82,10 @@ body.light-mode .quake-row{border-bottom-color:#f1f5f9}
 body.light-mode .quake-row:hover{background:#f1f5f9}
 body.light-mode .quake-meta{color:#64748b}
 body.light-mode .badge{border-color:#94a3b8;color:#0369a1}
-body.light-mode .theme-btn{background:#f8fafc;border-color:#cbd5e1;color:#0f172a}
-body.light-mode .theme-btn:hover{background:#f1f5f9}
+body.light-mode .theme-btn{background:linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);border-color:#cbd5e1;color:#0f172a;box-shadow:inset 0 1px 0 #ffffff, 0 1px 2px rgba(0,0,0,0.05)}
+body.light-mode .theme-btn:hover{background:linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);border-color:#94a3b8}
+body.light-mode .theme-btn.active-blue{background:linear-gradient(180deg, #0284c7 0%, #0369a1 100%) !important;border-color:#0284c7 !important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 6px rgba(2,132,199,0.3) !important;text-shadow:none}
+body.light-mode .theme-btn.active-orange{background:linear-gradient(180deg, #d97706 0%, #b45309 100%) !important;border-color:#d97706 !important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 6px rgba(217,119,6,0.3) !important;text-shadow:none}
 body.light-mode #legend{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
 body.light-mode #help{color:#64748b}
 
