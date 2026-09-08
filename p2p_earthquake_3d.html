@@ -36,7 +36,7 @@ h1{font-size:14px;margin:0;letter-spacing:0.04em}
 #status{font-size:11px;color:#607a90;margin-bottom:6px}
 #latest{font-size:12px;line-height:1.5}
 #summary{font-size:11px;color:#809ab0;margin:6px 0}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:8px 0}
+.tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin:8px 0}
 .tab{border:1px solid #233446;background:linear-gradient(180deg, #131d2a 0%, #0b1118 100%);color:#809ab0;border-radius:0;padding:5px 4px;cursor:pointer;font-size:11px;font-family:inherit;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
 .tab:hover{background:linear-gradient(180deg, #1b2a3d 0%, #101822 100%);color:#c5d2dc}
 .tab.active{background:linear-gradient(180deg, rgba(14,116,144,0.35) 0%, rgba(12,19,28,0.95) 100%);color:#00e5ff;border-color:#00e5ff;font-weight:700;box-shadow:inset 0 1px 0 rgba(0,229,255,0.4), 0 0 8px rgba(0,229,255,0.2);text-shadow:0 0 4px rgba(0,229,255,0.5)}
@@ -154,6 +154,8 @@ body.light-mode #help{color:#64748b}
           <button class="tab active" data-view="today">今日</button>
           <button class="tab" data-view="week">週</button>
           <button class="tab" data-view="month">月</button>
+          <button class="tab" data-view="3months">3ヶ月</button>
+          <button class="tab" data-view="1year">1年</button>
           <button class="tab" data-view="recent">直近</button>
         </div>
         <div id="summary"></div>
@@ -1695,20 +1697,92 @@ function magnitude(q){
   return m>=0 ? `M${m.toFixed(1)}` : 'M--';
 }
 
+let usgsHistory3Months = null;
+let usgsHistory1Year = null;
+
+async function fetchUSGSHistory(days) {
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 24 * 3600 * 1000);
+  const startStr = start.toISOString().split('T')[0];
+  const endStr = end.toISOString().split('T')[0];
+
+  const minMag = days > 90 ? 3.5 : 3.0; // 1年の場合はパフォーマンスに配慮しM3.5以上
+  const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson` +
+    `&starttime=${startStr}&endtime=${endStr}` +
+    `&minlatitude=20&maxlatitude=50&minlongitude=120&maxlongitude=155` +
+    `&minmagnitude=${minMag}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('USGS HTTPエラー ' + res.status);
+    const data = await res.json();
+
+    const items = [];
+    if (data.features && Array.isArray(data.features)) {
+      data.features.forEach((f, idx) => {
+        const timeMs = f.properties.time;
+        const coords = f.geometry?.coordinates;
+        if (!coords || coords.length < 3) return;
+
+        const q = {
+          id: `usgs_${f.id || idx}`,
+          code: 551,
+          _date: new Date(timeMs),
+          _timeMs: timeMs,
+          isUSGS: true,
+          earthquake: {
+            time: new Date(timeMs).toISOString(),
+            hypocenter: {
+              name: f.properties.place || f.properties.title || '日本近海 (USGS)',
+              latitude: coords[1],
+              longitude: coords[0],
+              depth: Math.max(0, Math.round(coords[2])),
+              magnitude: f.properties.mag != null ? f.properties.mag : -1
+            },
+            maxScale: null,
+            domesticTsunami: 'None'
+          },
+          points: []
+        };
+        items.push(q);
+        addQuake(q);
+      });
+    }
+
+    items.sort((a, b) => b._timeMs - a._timeMs);
+
+    if (days <= 90) {
+      usgsHistory3Months = items;
+      document.querySelector('#status').textContent = `USGS過去3ヶ月データ取得完了 (${items.length}件)`;
+    } else {
+      usgsHistory1Year = items;
+      document.querySelector('#status').textContent = `USGS過去1年データ取得完了 (${items.length}件)`;
+    }
+  } catch (e) {
+    console.error('USGS history fetch error:', e);
+    document.querySelector('#status').textContent = 'USGSデータ取得エラー: ' + e.message;
+  }
+}
+
 function viewItems(){
   const now=new Date();
   const start=new Date(now);
   if(currentView==='today'){
     start.setHours(0,0,0,0);
+    cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
   }else if(currentView==='week'){
     start.setDate(now.getDate() - 7);
+    cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
   }else if(currentView==='month'){
     start.setDate(1); start.setHours(0,0,0,0);
+    cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
+  }else if(currentView==='3months'){
+    cachedViewItems = usgsHistory3Months || [];
+  }else if(currentView==='1year'){
+    cachedViewItems = usgsHistory1Year || [];
   }else{
     cachedViewItems = earthquakes.slice(0,20);
-    return cachedViewItems;
   }
-  cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
   return cachedViewItems;
 }
 
@@ -1741,7 +1815,14 @@ function renderDashboard(){
   updateQuakeVisibility();
 
   const items = viewItems();
-  const labels={today:'今日',week:'今週（直近7日）',month:'今月',recent:'直近20件'};
+  const labels={
+    today: '今日',
+    week: '今週（直近7日）',
+    month: '今月',
+    '3months': '過去3ヶ月 (USGS)',
+    '1year': '過去1年 (USGS)',
+    recent: '直近20件'
+  };
   document.querySelector('#summary').textContent=`${labels[currentView]}：${items.length}件`;
 
   const latest=items[0] || earthquakes[0];
@@ -1794,9 +1875,18 @@ function renderDashboard(){
   });
 }
 
-function setView(view){
+async function setView(view){
   currentView=view;
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+
+  if (view === '3months' && !usgsHistory3Months) {
+    document.querySelector('#status').textContent = 'USGSより過去3ヶ月の地震データを取得中…';
+    await fetchUSGSHistory(90);
+  } else if (view === '1year' && !usgsHistory1Year) {
+    document.querySelector('#status').textContent = 'USGSより過去1年の地震データを取得中…';
+    await fetchUSGSHistory(365);
+  }
+
   renderDashboard();
 }
 
