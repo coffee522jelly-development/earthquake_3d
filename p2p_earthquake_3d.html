@@ -27,7 +27,22 @@ canvas{display:block}
 .theme-btn.active-blue{background:linear-gradient(180deg, rgba(14,116,144,0.85) 0%, rgba(3,105,161,0.95) 100%) !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(0,229,255,0.35) !important;text-shadow:0 0 4px rgba(0,229,255,0.6)}
 .theme-btn.active-orange{background:linear-gradient(180deg, rgba(180,83,9,0.85) 0%, rgba(146,64,14,0.95) 100%) !important;border-color:#f59e0b !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(245,158,11,0.35) !important;text-shadow:0 0 4px rgba(245,158,11,0.6)}
 #legend{background:#090e15;border:1px solid #1c2b3a;border-radius:0;padding:8px 10px;font-size:11px;line-height:1.45}
-#coord-hud{position:absolute;right:14px;bottom:12px;z-index:15;background:rgba(12,19,28,0.85);border:1px solid #233446;color:#00e5ff;padding:4px 10px;font-size:11px;font-weight:600;font-family:inherit;box-shadow:0 0 8px rgba(0,0,0,0.5);letter-spacing:0.03em;pointer-events:none}
+
+/* Bottom-right Camera Controls & Coordinates Panel */
+#bottom-right-panel{position:absolute;right:14px;bottom:12px;z-index:15;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#camera-controls{display:flex;align-items:center;gap:3px;background:rgba(12,19,28,0.85);border:1px solid #233446;padding:3px 6px;box-shadow:0 0 8px rgba(0,0,0,0.5)}
+.cam-label{font-size:10px;color:#607a90;font-weight:700;margin-right:2px;letter-spacing:0.04em}
+.cam-btn{background:linear-gradient(180deg, #131d2a 0%, #0b1118 100%);border:1px solid #233446;color:#809ab0;padding:4px 8px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease}
+.cam-btn:hover{background:linear-gradient(180deg, #1b2a3d 0%, #101822 100%);color:#c5d2dc;border-color:#3e5b7a}
+.cam-btn.active{background:linear-gradient(180deg, rgba(14,116,144,0.35) 0%, rgba(12,19,28,0.95) 100%);color:#00e5ff;border-color:#00e5ff;font-weight:700;box-shadow:inset 0 1px 0 rgba(0,229,255,0.4), 0 0 8px rgba(0,229,255,0.2);text-shadow:0 0 4px rgba(0,229,255,0.5)}
+
+body.light-mode #camera-controls{background:rgba(255,255,255,0.9);border-color:#cbd5e1;box-shadow:none}
+body.light-mode .cam-label{color:#64748b}
+body.light-mode .cam-btn{background:#f1f5f9;border-color:#cbd5e1;color:#475569}
+body.light-mode .cam-btn:hover{background:#e2e8f0;color:#0f172a}
+body.light-mode .cam-btn.active{background:#0284c7;color:#fff;border-color:#0284c7}
+
+#coord-hud{background:rgba(12,19,28,0.85);border:1px solid #233446;color:#00e5ff;padding:4px 10px;font-size:11px;font-weight:600;font-family:inherit;box-shadow:0 0 8px rgba(0,0,0,0.5);letter-spacing:0.03em;pointer-events:none}
 body.light-mode #coord-hud{background:rgba(255,255,255,0.9);border-color:#cbd5e1;color:#0284c7;box-shadow:none}
 
 #help{position:absolute;left:14px;bottom:12px;z-index:5;color:#5c7388;font-size:11px;font-family:inherit}
@@ -199,7 +214,18 @@ body.light-mode #help{color:#64748b}
       </div>
     </div>
   </div>
-  <div id="coord-hud">緯度: --.--°N / 経度: ---.--°E / 標高: 0m</div>
+  <!-- 右下の視点切り替えボタン & 座標HUD -->
+  <div id="bottom-right-panel">
+    <div id="camera-controls">
+      <span class="cam-label">視点:</span>
+      <button class="cam-btn active" data-view="front" title="正面（初期視点）">正面</button>
+      <button class="cam-btn" data-view="top" title="真上（鳥瞰図）">真上</button>
+      <button class="cam-btn" data-view="south" title="南側">南</button>
+      <button class="cam-btn" data-view="east" title="東側">東</button>
+      <button class="cam-btn" data-view="iso" title="斜め（俯瞰）">斜め</button>
+    </div>
+    <div id="coord-hud">緯度: --.--°N / 経度: ---.--°E / 標高: 0m</div>
+  </div>
   <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
 
 </div>
@@ -2402,9 +2428,44 @@ window.addEventListener('mousemove', (event) => {
   }
 });
 
+// 視点プリセット定義 (Camera Viewpoint Presets)
+const CAMERA_PRESETS = {
+  front: { pos: new THREE.Vector3(0, 420, 520), target: new THREE.Vector3(0, 0, 0) },
+  top:   { pos: new THREE.Vector3(0, 680, 0.1), target: new THREE.Vector3(0, 0, 0) },
+  south: { pos: new THREE.Vector3(0, 180, 580), target: new THREE.Vector3(0, 0, 0) },
+  east:  { pos: new THREE.Vector3(620, 220, 0),  target: new THREE.Vector3(0, 0, 0) },
+  iso:   { pos: new THREE.Vector3(380, 380, 380), target: new THREE.Vector3(0, 0, 0) }
+};
+
+let cameraAnimTarget = null;
+let cameraAnimStartPos = null;
+let cameraAnimStartTarget = null;
+let cameraAnimProgress = 1.0;
+
+function setCameraView(presetName) {
+  const preset = CAMERA_PRESETS[presetName];
+  if (!preset) return;
+
+  document.querySelectorAll('.cam-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === presetName);
+  });
+
+  cameraAnimStartPos = camera.position.clone();
+  cameraAnimStartTarget = controls.target.clone();
+  cameraAnimTarget = preset;
+  cameraAnimProgress = 0.0;
+}
+
+document.querySelectorAll('.cam-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setCameraView(btn.dataset.view);
+  });
+});
+
 window.addEventListener('click', async (event) => {
   // HUDやUIエレメント上のクリックは無視
-  if (event.target.closest('#top-left, #hud-section, #VRButton')) return;
+  if (event.target.closest('#top-left, #bottom-right-panel, #hud-section, #VRButton')) return;
 
   mouse.x = (event.clientX / innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / innerHeight) * 2 + 1;
@@ -2469,6 +2530,14 @@ const clock = new THREE.Clock();
 
 function animate(){
   const dt = clock.getDelta();
+
+  if (cameraAnimProgress < 1.0 && cameraAnimTarget) {
+    cameraAnimProgress += dt * 2.5; // smooth 0.4s transition
+    const easeT = Math.min(1.0, 1.0 - Math.pow(1.0 - cameraAnimProgress, 3)); // cubic ease out
+    camera.position.lerpVectors(cameraAnimStartPos, cameraAnimTarget.pos, easeT);
+    controls.target.lerpVectors(cameraAnimStartTarget, cameraAnimTarget.target, easeT);
+  }
+
   controls.update();
   handleXRControllerScale();
 
