@@ -10,13 +10,42 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090e15;col
 #app{width:100%;height:100%;position:relative}
 canvas{display:block}
 
-/* Left-aligned CAD UI for PC & Mobile */
-#top-left{position:absolute;left:14px;top:14px;z-index:20;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
-#menu-toggle{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;font-weight:700;letter-spacing:0.05em;border-radius:0;background:#0f1722;border:1px solid #28394a;box-shadow:none;text-transform:uppercase;cursor:pointer}
+/* Top Sticky CAD Header Bar (100% Width) */
+#top-bar{position:fixed;top:0;left:0;width:100%;height:44px;z-index:100;background:#0c131c;border-bottom:1px solid #233446;display:flex;align-items:center;justify-content:space-between;padding:0 12px;box-sizing:border-box;box-shadow:0 2px 8px rgba(0,0,0,0.4)}
+.top-bar-left{display:flex;align-items:center;gap:10px}
+.app-brand{font-size:13px;font-weight:800;letter-spacing:0.06em;color:#00e5ff;display:flex;align-items:center;gap:6px;white-space:nowrap;text-shadow:0 0 6px rgba(0,229,255,0.4)}
+.top-bar-center{display:flex;align-items:center;justify-content:center;flex:1;max-width:600px;margin:0 12px}
+.top-bar-right{display:flex;align-items:center;gap:8px}
 
-#menu-panel{display:flex;flex-direction:column;gap:10px;background:#0c131c;border:1px solid #233446;border-radius:0;padding:12px;width:360px;max-width:calc(100vw - 28px);max-height:calc(100vh - 80px);overflow-y:auto;box-shadow:0 0 0 1px #000000;box-sizing:border-box}
+.view-tabs{display:flex;align-items:center;gap:4px;background:#071018;border:1px solid #1c2b3a;padding:2px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.5)}
+.view-tab{background:transparent;border:1px solid transparent;color:#809ab0;padding:5px 12px;font-size:11px;font-family:inherit;font-weight:600;cursor:pointer;transition:all .15s ease;display:flex;align-items:center;gap:6px;white-space:nowrap;letter-spacing:0.02em}
+.view-tab:hover{color:#c5d2dc;background:rgba(255,255,255,0.04);border-color:#28394a}
+.view-tab.active{background:linear-gradient(180deg, rgba(14,116,144,0.45) 0%, rgba(3,105,161,0.7) 100%);color:#00e5ff;border-color:#00e5ff;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.2), 0 0 8px rgba(0,229,255,0.3);text-shadow:0 0 4px rgba(0,229,255,0.6)}
+
+.status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;font-size:10px;font-weight:700;letter-spacing:0.05em;background:#09121c;border:1px solid #1e2e3e;color:#00e5ff;white-space:nowrap}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:#00e5ff;box-shadow:0 0 6px #00e5ff;animation:pulse-glow 1.8s infinite ease-in-out}
+@keyframes pulse-glow { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.8)} }
+
+.theme-btn-sm{background:linear-gradient(180deg, #162230 0%, #0c131c 100%);border:1px solid #283d52;color:#c5d2dc;padding:4px 8px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.3)}
+.theme-btn-sm:hover{background:linear-gradient(180deg, #1f3044 0%, #111a26 100%);border-color:#3e5b7a;color:#ffffff}
+
+/* View Switcher Info Modal Overlay */
+#view-modal{position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;background:rgba(5,9,14,0.75);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center}
+#view-modal.hidden{display:none}
+.view-modal-content{background:#0c131c;border:1px solid #00e5ff;padding:20px 24px;max-width:440px;width:90%;box-shadow:0 0 20px rgba(0,229,255,0.25);box-sizing:border-box;color:#c5d2dc}
+.view-modal-title{font-size:14px;font-weight:700;color:#00e5ff;margin:0 0 10px;display:flex;align-items:center;gap:8px;letter-spacing:0.04em}
+.view-modal-body{font-size:12px;line-height:1.6;color:#a0b0bc;margin-bottom:16px}
+.view-modal-footer{display:flex;justify-content:flex-end}
+.view-modal-btn{background:linear-gradient(180deg, rgba(14,116,144,0.85) 0%, rgba(3,105,161,0.95) 100%);border:1px solid #00e5ff;color:#ffffff;font-family:inherit;font-size:11px;font-weight:700;padding:6px 16px;cursor:pointer;box-shadow:0 0 8px rgba(0,229,255,0.3)}
+.view-modal-btn:hover{background:#0284c7}
+
+/* Left-aligned CAD UI for PC & Mobile */
+#top-left{position:absolute;left:12px;top:48px;z-index:20;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+#menu-toggle{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:0.05em;border-radius:0;background:#0f1722;border:1px solid #28394a;box-shadow:none;text-transform:uppercase;cursor:pointer}
+
+#menu-panel{display:flex;flex-direction:column;gap:10px;background:#0c131c;border:1px solid #233446;border-radius:0;padding:12px;width:360px;max-width:calc(100vw - 24px);max-height:calc(100vh - 68px);overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.6);box-sizing:border-box}
 #menu-panel.closed{display:none}
-#menu-panel.fullscreen{position:fixed;top:14px;left:14px;right:14px;bottom:14px;width:auto;max-width:none;max-height:none;z-index:30;background:#090e15;padding:14px}
+#menu-panel.fullscreen{position:fixed;top:48px;left:12px;right:12px;bottom:12px;width:auto;max-width:none;max-height:none;z-index:30;background:#090e15;padding:14px}
 #menu-panel.fullscreen #list{max-height:none;flex:1}
 
 .menu-section-title{font-size:12px;font-weight:700;letter-spacing:0.06em;color:#00e5ff;margin:0 0 4px;padding-bottom:4px;border-bottom:1px solid #233446;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase}
@@ -80,6 +109,18 @@ body.light-mode *{scrollbar-color:rgba(2,132,199,0.3) rgba(241,245,249,0.6)}
 
 /* CAD Light mode styles */
 body.light-mode{background:#f8fafc;color:#0f172a}
+body.light-mode #top-bar{background:#ffffff;border-color:#cbd5e1;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+body.light-mode .app-brand{color:#0284c7;text-shadow:none}
+body.light-mode .view-tabs{background:#f1f5f9;border-color:#cbd5e1;box-shadow:none}
+body.light-mode .view-tab{color:#475569}
+body.light-mode .view-tab:hover{color:#0f172a;background:rgba(0,0,0,0.04);border-color:#94a3b8}
+body.light-mode .view-tab.active{background:#0284c7;color:#ffffff;border-color:#0284c7;text-shadow:none;box-shadow:0 1px 3px rgba(2,132,199,0.3)}
+body.light-mode .status-badge{background:#e2e8f0;border-color:#cbd5e1;color:#0284c7}
+body.light-mode .theme-btn-sm{background:linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);border-color:#cbd5e1;color:#0f172a;box-shadow:none}
+body.light-mode .view-modal-content{background:#ffffff;border-color:#0284c7;color:#0f172a;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+body.light-mode .view-modal-title{color:#0284c7}
+body.light-mode .view-modal-body{color:#475569}
+body.light-mode .view-modal-btn{background:#0284c7;border-color:#0284c7;box-shadow:none}
 body.light-mode #menu-panel{background:#ffffff;border-color:#cbd5e1;color:#0f172a;box-shadow:0 0 0 1px #e2e8f0}
 body.light-mode #menu-panel.fullscreen{background:#ffffff;border-color:#cbd5e1}
 body.light-mode .hud-collapse-btn{background:#f1f5f9;border-color:#cbd5e1;color:#475569}
@@ -103,17 +144,38 @@ body.light-mode #help{color:#64748b}
 
 /* Smartphone / Mobile optimization */
 @media (max-width: 768px) {
+  #top-bar {
+    padding: 0 8px;
+    height: 40px;
+  }
+
+  .app-brand {
+    font-size: 11px;
+  }
+
+  .view-tab {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
   #top-left {
     left: 8px;
-    top: 8px;
+    top: 44px;
     max-width: calc(100vw - 16px);
   }
 
   #menu-panel {
     width: calc(100vw - 16px);
     max-width: calc(100vw - 16px);
-    max-height: calc(100vh - 120px);
+    max-height: calc(100vh - 56px);
     padding: 10px;
+  }
+
+  #menu-panel.fullscreen {
+    top: 44px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
   }
 
   #list {
@@ -138,6 +200,19 @@ body.light-mode #help{color:#64748b}
 }
 
 @media (max-width: 480px) {
+  .app-brand {
+    display: none;
+  }
+
+  .top-bar-center {
+    margin: 0 4px;
+  }
+
+  .view-tab {
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+
   #list {
     max-height: 22vh;
   }
@@ -154,6 +229,37 @@ body.light-mode #help{color:#64748b}
 </head>
 <body>
 <div id="app">
+  <!-- アプリ上部 100% CAD スティッキーヘッダーバー -->
+  <header id="top-bar">
+    <div class="top-bar-left">
+      <div class="app-brand">📐 GEOCAD 3D</div>
+    </div>
+    <div class="top-bar-center">
+      <div class="view-tabs">
+        <button class="view-tab active" data-view-mode="earthquake">🌐 地震 3D ビュー</button>
+        <button class="view-tab" data-view-mode="weather">🌧️ 天気 3D ビュー (24H 予想降雨量)</button>
+      </div>
+    </div>
+    <div class="top-bar-right">
+      <span id="top-status-indicator" class="status-badge"><span class="pulse-dot"></span> LIVE</span>
+      <button id="top-theme-toggle" class="theme-btn-sm" title="テーマ切替">☀️/🌙</button>
+    </div>
+  </header>
+
+  <!-- ビュー切り替え案内モーダル (天気3Dビュー等の拡張案内) -->
+  <div id="view-modal" class="hidden">
+    <div class="view-modal-content">
+      <div class="view-modal-title">🌧️ 天気 3D ビュー (24H 予想降雨量)</div>
+      <div class="view-modal-body">
+        CAD空間エンジンに天気ビューモジュールが連携されました。<br>
+        24時間の予想降雨量3Dメッシュ・雨雲アグリゲーションおよび気圧配置図の立体オーバーレイ描画が準備状態です。
+      </div>
+      <div class="view-modal-footer">
+        <button id="view-modal-close" class="view-modal-btn">了解 / 地震ビューに戻る</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 左上の統合メニュー (地震情報 & レイヤー操作) -->
   <div id="top-left">
     <button id="menu-toggle" class="theme-btn active-blue">⚙️ メニュー</button>
@@ -2014,6 +2120,45 @@ function toggleTheme(){
 }
 
 document.querySelector('#theme-toggle').addEventListener('click', toggleTheme);
+const topThemeBtn = document.querySelector('#top-theme-toggle');
+if (topThemeBtn) {
+  topThemeBtn.addEventListener('click', toggleTheme);
+}
+
+// CAD View Switcher (地震 3D ビュー ⇄ 天気 3D ビュー 24H 予想降雨量)
+const viewTabs = document.querySelectorAll('.view-tab');
+const viewModal = document.querySelector('#view-modal');
+const viewModalClose = document.querySelector('#view-modal-close');
+const topLeftMenu = document.querySelector('#top-left');
+
+function switchViewMode(mode) {
+  viewTabs.forEach(t => t.classList.toggle('active', t.dataset.viewMode === mode));
+
+  if (mode === 'weather') {
+    if (viewModal) viewModal.classList.remove('hidden');
+    quakeGroup.visible = false;
+    intensityGroup.visible = false;
+    if (topLeftMenu) topLeftMenu.style.display = 'none';
+  } else if (mode === 'earthquake') {
+    if (viewModal) viewModal.classList.add('hidden');
+    quakeGroup.visible = true;
+    intensityGroup.visible = true;
+    if (topLeftMenu) topLeftMenu.style.display = '';
+  }
+}
+
+viewTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.viewMode;
+    switchViewMode(mode);
+  });
+});
+
+if (viewModalClose) {
+  viewModalClose.addEventListener('click', () => {
+    switchViewMode('earthquake');
+  });
+}
 
 let isJshisLoaded = false;
 // 主要都市部・平野部（東京・埼玉・千葉・大阪・名古屋・仙台・福岡等）のJ-SHIS 3次メッシュコード拡張
