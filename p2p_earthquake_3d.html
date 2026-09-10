@@ -27,7 +27,22 @@ canvas{display:block}
 .theme-btn.active-blue{background:linear-gradient(180deg, rgba(14,116,144,0.85) 0%, rgba(3,105,161,0.95) 100%) !important;border-color:#00e5ff !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(0,229,255,0.35) !important;text-shadow:0 0 4px rgba(0,229,255,0.6)}
 .theme-btn.active-orange{background:linear-gradient(180deg, rgba(180,83,9,0.85) 0%, rgba(146,64,14,0.95) 100%) !important;border-color:#f59e0b !important;color:#ffffff !important;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(245,158,11,0.35) !important;text-shadow:0 0 4px rgba(245,158,11,0.6)}
 #legend{background:#090e15;border:1px solid #1c2b3a;border-radius:0;padding:8px 10px;font-size:11px;line-height:1.45}
-#coord-hud{position:absolute;right:14px;bottom:12px;z-index:15;background:rgba(12,19,28,0.85);border:1px solid #233446;color:#00e5ff;padding:4px 10px;font-size:11px;font-weight:600;font-family:inherit;box-shadow:0 0 8px rgba(0,0,0,0.5);letter-spacing:0.03em;pointer-events:none}
+
+/* Bottom-right Camera Controls & Coordinates Panel */
+#bottom-right-panel{position:absolute;right:14px;bottom:12px;z-index:15;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#camera-controls{display:flex;align-items:center;gap:3px;background:rgba(12,19,28,0.85);border:1px solid #233446;padding:3px 6px;box-shadow:0 0 8px rgba(0,0,0,0.5)}
+.cam-label{font-size:10px;color:#607a90;font-weight:700;margin-right:2px;letter-spacing:0.04em}
+.cam-btn{background:linear-gradient(180deg, #131d2a 0%, #0b1118 100%);border:1px solid #233446;color:#809ab0;padding:4px 8px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s ease}
+.cam-btn:hover{background:linear-gradient(180deg, #1b2a3d 0%, #101822 100%);color:#c5d2dc;border-color:#3e5b7a}
+.cam-btn.active{background:linear-gradient(180deg, rgba(14,116,144,0.35) 0%, rgba(12,19,28,0.95) 100%);color:#00e5ff;border-color:#00e5ff;font-weight:700;box-shadow:inset 0 1px 0 rgba(0,229,255,0.4), 0 0 8px rgba(0,229,255,0.2);text-shadow:0 0 4px rgba(0,229,255,0.5)}
+
+body.light-mode #camera-controls{background:rgba(255,255,255,0.9);border-color:#cbd5e1;box-shadow:none}
+body.light-mode .cam-label{color:#64748b}
+body.light-mode .cam-btn{background:#f1f5f9;border-color:#cbd5e1;color:#475569}
+body.light-mode .cam-btn:hover{background:#e2e8f0;color:#0f172a}
+body.light-mode .cam-btn.active{background:#0284c7;color:#fff;border-color:#0284c7}
+
+#coord-hud{background:rgba(12,19,28,0.85);border:1px solid #233446;color:#00e5ff;padding:4px 10px;font-size:11px;font-weight:600;font-family:inherit;box-shadow:0 0 8px rgba(0,0,0,0.5);letter-spacing:0.03em;pointer-events:none}
 body.light-mode #coord-hud{background:rgba(255,255,255,0.9);border-color:#cbd5e1;color:#0284c7;box-shadow:none}
 
 #help{position:absolute;left:14px;bottom:12px;z-index:5;color:#5c7388;font-size:11px;font-family:inherit}
@@ -36,7 +51,7 @@ h1{font-size:14px;margin:0;letter-spacing:0.04em}
 #status{font-size:11px;color:#607a90;margin-bottom:6px}
 #latest{font-size:12px;line-height:1.5}
 #summary{font-size:11px;color:#809ab0;margin:6px 0}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:8px 0}
+.tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin:8px 0}
 .tab{border:1px solid #233446;background:linear-gradient(180deg, #131d2a 0%, #0b1118 100%);color:#809ab0;border-radius:0;padding:5px 4px;cursor:pointer;font-size:11px;font-family:inherit;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
 .tab:hover{background:linear-gradient(180deg, #1b2a3d 0%, #101822 100%);color:#c5d2dc}
 .tab.active{background:linear-gradient(180deg, rgba(14,116,144,0.35) 0%, rgba(12,19,28,0.95) 100%);color:#00e5ff;border-color:#00e5ff;font-weight:700;box-shadow:inset 0 1px 0 rgba(0,229,255,0.4), 0 0 8px rgba(0,229,255,0.2);text-shadow:0 0 4px rgba(0,229,255,0.5)}
@@ -154,6 +169,8 @@ body.light-mode #help{color:#64748b}
           <button class="tab active" data-view="today">今日</button>
           <button class="tab" data-view="week">週</button>
           <button class="tab" data-view="month">月</button>
+          <button class="tab" data-view="3months">3ヶ月</button>
+          <button class="tab" data-view="1year">1年</button>
           <button class="tab" data-view="recent">直近</button>
         </div>
         <div id="summary"></div>
@@ -166,6 +183,7 @@ body.light-mode #help{color:#64748b}
         <div class="menu-section-title">⚙️ レイヤー・操作</div>
         <div class="menu-buttons">
           <button id="overlay-toggle" class="theme-btn">🗺️ 2階地図 (震度面)</button>
+          <button id="slab-toggle" class="theme-btn">🌊 プレート深部スラブ</button>
           <button id="volcano-toggle" class="theme-btn">🌋 活火山</button>
           <button id="jshis-toggle" class="theme-btn">🏢 J-SHIS 地盤構造</button>
           <button id="stress-toggle" class="theme-btn">↗️ 地盤動揺・応力 (USGS)</button>
@@ -180,6 +198,9 @@ body.light-mode #help{color:#64748b}
             <span style="color:#eab308">━</span> Z/その他の主要断層帯<br>
             <span style="color:#00e5ff">━</span> プレート境界・海溝系
           </div>
+          <div style="margin-top:4px;font-size:11px;color:#818cf8">
+            🌊 プレート深部スラブ (沈み込み帯 50km~300km等深線)
+          </div>
           <div style="margin-top:4px;font-size:11px;color:#38bdf8">
             ■ J-SHIS 深部地盤 (S波速度3.2km/s工学的基盤面)
           </div>
@@ -193,7 +214,18 @@ body.light-mode #help{color:#64748b}
       </div>
     </div>
   </div>
-  <div id="coord-hud">緯度: --.--°N / 経度: ---.--°E / 標高: 0m</div>
+  <!-- 右下の視点切り替えボタン & 座標HUD -->
+  <div id="bottom-right-panel">
+    <div id="camera-controls">
+      <span class="cam-label">視点:</span>
+      <button class="cam-btn active" data-view="front" title="正面（初期視点）">正面</button>
+      <button class="cam-btn" data-view="top" title="真上（鳥瞰図）">真上</button>
+      <button class="cam-btn" data-view="south" title="南側">南</button>
+      <button class="cam-btn" data-view="east" title="東側">東</button>
+      <button class="cam-btn" data-view="iso" title="斜め（俯瞰）">斜め</button>
+    </div>
+    <div id="coord-hud">緯度: --.--°N / 経度: ---.--°E / 標高: 0m</div>
+  </div>
   <div id="help">ドラッグ: 回転 / ホイール: ズーム / 右ドラッグ: 移動</div>
 
 </div>
@@ -379,7 +411,69 @@ function buildCurvedGrid() {
     const geo = new THREE.BufferGeometry().setFromPoints(minorPairs);
     curvedGridGroup.add(new THREE.LineSegments(geo, gridMinorMat));
   }
+
+  // 東西南北 方位指標 (Cardinal Compass Indicators)
+  addCardinalCompassIndicators();
 }
+
+// 東西南北・方位軸 & 中心指標の描画
+function addCardinalCompassIndicators() {
+  const cardinalColor = new THREE.Color(0x00e5ff);
+  const cardinalMat = new THREE.LineDashedMaterial({
+    color: 0x00e5ff,
+    dashSize: 4,
+    gapSize: 3,
+    transparent: true,
+    opacity: 0.75
+  });
+
+  const centerLon = 136.0;
+  const centerLat = 35.0;
+  const cCenter = geoToSeaLevel3D(centerLon, centerLat, 0.5);
+
+  // 1. 北 (N) / 南 (S) / 東 (E) / 西 (W) 方位線と端点ラベル
+  const directions = [
+    { name: '北 (N)', lon: centerLon, lat: 51.5, offset: [0, 8, 0] },
+    { name: '南 (S)', lon: centerLon, lat: 18.5, offset: [0, -8, 0] },
+    { name: '東 (E)', lon: 153.5, lat: centerLat, offset: [10, 0, 0] },
+    { name: '西 (W)', lon: 118.5, lat: centerLat, offset: [-10, 0, 0] }
+  ];
+
+  directions.forEach(dir => {
+    const linePts = interpolateSeaLevelLine([[centerLon, centerLat], [dir.lon, dir.lat]], 0.05, 0.5);
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+    const lineMesh = new THREE.Line(lineGeo, cardinalMat);
+    lineMesh.computeLineDistances();
+    curvedGridGroup.add(lineMesh);
+
+    const endPos = geoToSeaLevel3D(dir.lon, dir.lat, 1.0);
+    const label = createTextSprite(dir.name, cardinalColor);
+    label.position.copy(endPos).add(new THREE.Vector3(...dir.offset));
+    curvedGridGroup.add(label);
+  });
+
+  // 2. 日本列島中心（明石・東経135度付近）を通る垂直地軸 (Geographic Earth Axis Pole)
+  const axisTop = geoToSeaLevel3D(centerLon, centerLat, 40.0);
+  const axisBottom = geoTo3D(centerLon, centerLat, 300);
+
+  const axisGeo = new THREE.BufferGeometry().setFromPoints([axisTop, axisBottom]);
+  const axisLineMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.7 });
+  curvedGridGroup.add(new THREE.Line(axisGeo, axisLineMat));
+
+  // 中心軸標識リング
+  const ringGeo = new THREE.RingGeometry(8, 9.5, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.position.copy(cCenter);
+  ringMesh.rotation.x = -Math.PI / 2;
+  curvedGridGroup.add(ringMesh);
+
+  // 中心軸ラベル
+  const centerLabel = createTextSprite('地軸 Center (136°E, 35°N)', cardinalColor);
+  centerLabel.position.copy(axisTop).add(new THREE.Vector3(0, 10, 0));
+  curvedGridGroup.add(centerLabel);
+}
+
 buildCurvedGrid();
 
 // 海面指定高度 (offset) に沿って細分化補間するライン
@@ -437,6 +531,10 @@ worldGroup.add(overlayMapGroup);
 
 const faultGroup = new THREE.Group();
 worldGroup.add(faultGroup);
+
+const slabGroup = new THREE.Group();
+worldGroup.add(slabGroup);
+slabGroup.visible = false;
 
 const jshisGroup = new THREE.Group();
 worldGroup.add(jshisGroup);
@@ -836,11 +934,173 @@ function addFaults() {
   });
 }
 
+// ----------------------------------------------------
+// プレート深部スラブ・沈み込み帯 3D立体構造 (Subducting Plate Slabs)
+// ----------------------------------------------------
+const slabShaderMaterials = [];
+
+const slabVertexShader = `
+  varying vec2 vUv;
+  varying float vDepth;
+  varying vec3 vWorldPosition;
+  attribute float depth;
+  void main() {
+    vUv = uv;
+    vDepth = depth;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPos.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const slabFragmentShader = `
+  uniform float uTime;
+  varying vec2 vUv;
+  varying float vDepth;
+  varying vec3 vWorldPosition;
+
+  void main() {
+    // 深度(0km ~ 300km) に応じたグラデーション: 浅(シアン) -> 中(青) -> 深(紫・インディゴ)
+    float normDepth = clamp(vDepth / 300.0, 0.0, 1.0);
+    vec3 shallowColor = vec3(0.0, 0.9, 1.0);  // 0km - 50km
+    vec3 midColor     = vec3(0.1, 0.4, 0.95); // 100km - 150km
+    vec3 deepColor    = vec3(0.5, 0.1, 0.85); // 200km - 300km
+
+    vec3 baseColor = normDepth < 0.5 ? mix(shallowColor, midColor, normDepth * 2.0) : mix(midColor, deepColor, (normDepth - 0.5) * 2.0);
+
+    // 等深線 (Iso-depth contour lines: 50km間隔)
+    float contour = abs(sin(vDepth * 0.0628318));
+    float contourGlow = smoothstep(0.12, 0.0, contour) * 0.65;
+
+    // スラブに沿った微細な沈み込み流れパルス
+    float flowPulse = sin(vUv.y * 35.0 - uTime * 2.5) * 0.5 + 0.5;
+    flowPulse = pow(flowPulse, 4.0) * 0.3;
+
+    vec3 finalColor = baseColor + vec3(contourGlow) + vec3(flowPulse * 0.5);
+    float alpha = 0.50 + contourGlow * 0.35;
+
+    gl_FragColor = vec4(finalColor, alpha);
+  }
+`;
+
+const SUBDUCTING_SLABS = [
+  // 1. 太平洋プレートスラブ (Pacific Plate Slab): 日本海溝・千島海溝から西北西(WNW)へ沈み込み (0km -> 100km -> 200km -> 300km)
+  {
+    name: '太平洋プレート沈み込みスラブ',
+    trenchCoords: [[147.0, 43.5], [145.2, 42.0], [144.6, 40.5], [143.8, 38.5], [142.5, 36.5], [141.2, 34.5]],
+    dipVector: [-5.0, 1.2], // 西北西方向への傾斜ベクトル (lonShift, latShift)
+    depthProfiles: [0, 60, 150, 280] // 各並行列の深さ (km)
+  },
+  // 2. フィリピン海プレートスラブ (Philippine Sea Plate Slab): 南海トラフ・相模トラフから北西(NW)へ沈み込み (0km -> 40km -> 90km -> 150km)
+  {
+    name: 'フィリピン海プレート沈み込みスラブ',
+    trenchCoords: [[139.6, 34.9], [138.0, 34.0], [136.0, 33.2], [134.0, 32.5], [132.0, 31.5], [130.5, 30.5]],
+    dipVector: [-3.5, 3.2], // 北西方向への傾斜ベクトル (lonShift, latShift)
+    depthProfiles: [0, 40, 85, 140]
+  }
+];
+
+function initSubductingSlabs() {
+  SUBDUCTING_SLABS.forEach(slab => {
+    const trench = slab.trenchCoords;
+    const dip = slab.dipVector;
+    const depths = slab.depthProfiles;
+
+    const rows = depths.length;
+    const cols = trench.length;
+
+    const positions = [];
+    const uvs = [];
+    const depthAttrs = [];
+    const indices = [];
+
+    for (let r = 0; r < rows; r++) {
+      const depthKm = depths[r];
+      const shiftRatio = r / (rows - 1);
+
+      for (let c = 0; c < cols; c++) {
+        const baseLon = trench[c][0];
+        const baseLat = trench[c][1];
+
+        const lon = baseLon + dip[0] * shiftRatio;
+        const lat = baseLat + dip[1] * shiftRatio;
+
+        const p3d = geoTo3D(lon, lat, depthKm);
+
+        positions.push(p3d.x, p3d.y, p3d.z);
+        uvs.push(c / (cols - 1), shiftRatio);
+        depthAttrs.push(depthKm);
+
+        if (r < rows - 1 && c < cols - 1) {
+          const curr = r * cols + c;
+          const next = (r + 1) * cols + c;
+
+          indices.push(curr, next, curr + 1);
+          indices.push(curr + 1, next, next + 1);
+        }
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setAttribute('depth', new THREE.Float32BufferAttribute(depthAttrs, 1));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: slabVertexShader,
+      fragmentShader: slabFragmentShader,
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthWrite: false
+    });
+
+    slabShaderMaterials.push(mat);
+
+    const slabMesh = new THREE.Mesh(geo, mat);
+    slabGroup.add(slabMesh);
+
+    // 等深線 50km, 100km, 200km ガイド描画 (Wireframe contour lines)
+    for (let r = 0; r < rows; r++) {
+      const contourPts = [];
+      for (let c = 0; c < cols; c++) {
+        const baseLon = trench[c][0];
+        const baseLat = trench[c][1];
+        const shiftRatio = r / (rows - 1);
+        const lon = baseLon + dip[0] * shiftRatio;
+        const lat = baseLat + dip[1] * shiftRatio;
+        contourPts.push(geoTo3D(lon, lat, depths[r]));
+      }
+      const contourGeo = new THREE.BufferGeometry().setFromPoints(contourPts);
+      const contourMat = new THREE.LineBasicMaterial({
+        color: getDepthColor(depths[r]),
+        transparent: true,
+        opacity: 0.8
+      });
+      slabGroup.add(new THREE.Line(contourGeo, contourMat));
+
+      // 等深線テキストラベル ("100km", "200km")
+      if (contourPts.length > 0 && depths[r] > 0) {
+        const midIdx = Math.floor(contourPts.length / 2);
+        const labelPos = contourPts[midIdx];
+        const label = createTextSprite(`${slab.name} (${depths[r]}km面)`, getDepthColor(depths[r]));
+        label.position.copy(labelPos).add(new THREE.Vector3(0, 5, 0));
+        slabGroup.add(label);
+      }
+    }
+  });
+}
+
 async function loadMap(){
   const r=await fetch(GEOJSON_URL);
   if(!r.ok) throw new Error('日本地図の取得に失敗');
   addGeoJSON(await r.json());
   addFaults();
+  initSubductingSlabs();
 }
 
 // 地震 & 震度表示
@@ -1143,6 +1403,12 @@ document.querySelector('#overlay-toggle').addEventListener('click', () => {
   overlayMapGroup.visible = !overlayMapGroup.visible;
   const btn = document.querySelector('#overlay-toggle');
   btn.classList.toggle('active-blue', overlayMapGroup.visible);
+});
+
+document.querySelector('#slab-toggle').addEventListener('click', () => {
+  slabGroup.visible = !slabGroup.visible;
+  const btn = document.querySelector('#slab-toggle');
+  btn.classList.toggle('active-blue', slabGroup.visible);
 });
 
 document.querySelector('#volcano-toggle').addEventListener('click', () => {
@@ -1457,20 +1723,92 @@ function magnitude(q){
   return m>=0 ? `M${m.toFixed(1)}` : 'M--';
 }
 
+let usgsHistory3Months = null;
+let usgsHistory1Year = null;
+
+async function fetchUSGSHistory(days) {
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 24 * 3600 * 1000);
+  const startStr = start.toISOString().split('T')[0];
+  const endStr = end.toISOString().split('T')[0];
+
+  const minMag = days > 90 ? 3.5 : 3.0; // 1年の場合はパフォーマンスに配慮しM3.5以上
+  const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson` +
+    `&starttime=${startStr}&endtime=${endStr}` +
+    `&minlatitude=20&maxlatitude=50&minlongitude=120&maxlongitude=155` +
+    `&minmagnitude=${minMag}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('USGS HTTPエラー ' + res.status);
+    const data = await res.json();
+
+    const items = [];
+    if (data.features && Array.isArray(data.features)) {
+      data.features.forEach((f, idx) => {
+        const timeMs = f.properties.time;
+        const coords = f.geometry?.coordinates;
+        if (!coords || coords.length < 3) return;
+
+        const q = {
+          id: `usgs_${f.id || idx}`,
+          code: 551,
+          _date: new Date(timeMs),
+          _timeMs: timeMs,
+          isUSGS: true,
+          earthquake: {
+            time: new Date(timeMs).toISOString(),
+            hypocenter: {
+              name: f.properties.place || f.properties.title || '日本近海 (USGS)',
+              latitude: coords[1],
+              longitude: coords[0],
+              depth: Math.max(0, Math.round(coords[2])),
+              magnitude: f.properties.mag != null ? f.properties.mag : -1
+            },
+            maxScale: null,
+            domesticTsunami: 'None'
+          },
+          points: []
+        };
+        items.push(q);
+        addQuake(q);
+      });
+    }
+
+    items.sort((a, b) => b._timeMs - a._timeMs);
+
+    if (days <= 90) {
+      usgsHistory3Months = items;
+      document.querySelector('#status').textContent = `USGS過去3ヶ月データ取得完了 (${items.length}件)`;
+    } else {
+      usgsHistory1Year = items;
+      document.querySelector('#status').textContent = `USGS過去1年データ取得完了 (${items.length}件)`;
+    }
+  } catch (e) {
+    console.error('USGS history fetch error:', e);
+    document.querySelector('#status').textContent = 'USGSデータ取得エラー: ' + e.message;
+  }
+}
+
 function viewItems(){
   const now=new Date();
   const start=new Date(now);
   if(currentView==='today'){
     start.setHours(0,0,0,0);
+    cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
   }else if(currentView==='week'){
     start.setDate(now.getDate() - 7);
+    cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
   }else if(currentView==='month'){
     start.setDate(1); start.setHours(0,0,0,0);
+    cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
+  }else if(currentView==='3months'){
+    cachedViewItems = usgsHistory3Months || [];
+  }else if(currentView==='1year'){
+    cachedViewItems = usgsHistory1Year || [];
   }else{
     cachedViewItems = earthquakes.slice(0,20);
-    return cachedViewItems;
   }
-  cachedViewItems = earthquakes.filter(q=>quakeDate(q)>=start);
   return cachedViewItems;
 }
 
@@ -1503,7 +1841,14 @@ function renderDashboard(){
   updateQuakeVisibility();
 
   const items = viewItems();
-  const labels={today:'今日',week:'今週（直近7日）',month:'今月',recent:'直近20件'};
+  const labels={
+    today: '今日',
+    week: '今週（直近7日）',
+    month: '今月',
+    '3months': '過去3ヶ月 (USGS)',
+    '1year': '過去1年 (USGS)',
+    recent: '直近20件'
+  };
   document.querySelector('#summary').textContent=`${labels[currentView]}：${items.length}件`;
 
   const latest=items[0] || earthquakes[0];
@@ -1556,9 +1901,18 @@ function renderDashboard(){
   });
 }
 
-function setView(view){
+async function setView(view){
   currentView=view;
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+
+  if (view === '3months' && !usgsHistory3Months) {
+    document.querySelector('#status').textContent = 'USGSより過去3ヶ月の地震データを取得中…';
+    await fetchUSGSHistory(90);
+  } else if (view === '1year' && !usgsHistory1Year) {
+    document.querySelector('#status').textContent = 'USGSより過去1年の地震データを取得中…';
+    await fetchUSGSHistory(365);
+  }
+
   renderDashboard();
 }
 
@@ -2074,9 +2428,44 @@ window.addEventListener('mousemove', (event) => {
   }
 });
 
+// 視点プリセット定義 (Camera Viewpoint Presets)
+const CAMERA_PRESETS = {
+  front: { pos: new THREE.Vector3(0, 420, 520), target: new THREE.Vector3(0, 0, 0) },
+  top:   { pos: new THREE.Vector3(0, 680, 0.1), target: new THREE.Vector3(0, 0, 0) },
+  south: { pos: new THREE.Vector3(0, 180, 580), target: new THREE.Vector3(0, 0, 0) },
+  east:  { pos: new THREE.Vector3(620, 220, 0),  target: new THREE.Vector3(0, 0, 0) },
+  iso:   { pos: new THREE.Vector3(380, 380, 380), target: new THREE.Vector3(0, 0, 0) }
+};
+
+let cameraAnimTarget = null;
+let cameraAnimStartPos = null;
+let cameraAnimStartTarget = null;
+let cameraAnimProgress = 1.0;
+
+function setCameraView(presetName) {
+  const preset = CAMERA_PRESETS[presetName];
+  if (!preset) return;
+
+  document.querySelectorAll('.cam-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === presetName);
+  });
+
+  cameraAnimStartPos = camera.position.clone();
+  cameraAnimStartTarget = controls.target.clone();
+  cameraAnimTarget = preset;
+  cameraAnimProgress = 0.0;
+}
+
+document.querySelectorAll('.cam-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setCameraView(btn.dataset.view);
+  });
+});
+
 window.addEventListener('click', async (event) => {
   // HUDやUIエレメント上のクリックは無視
-  if (event.target.closest('#top-left, #hud-section, #VRButton')) return;
+  if (event.target.closest('#top-left, #bottom-right-panel, #hud-section, #VRButton')) return;
 
   mouse.x = (event.clientX / innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / innerHeight) * 2 + 1;
@@ -2141,12 +2530,23 @@ const clock = new THREE.Clock();
 
 function animate(){
   const dt = clock.getDelta();
+
+  if (cameraAnimProgress < 1.0 && cameraAnimTarget) {
+    cameraAnimProgress += dt * 2.5; // smooth 0.4s transition
+    const easeT = Math.min(1.0, 1.0 - Math.pow(1.0 - cameraAnimProgress, 3)); // cubic ease out
+    camera.position.lerpVectors(cameraAnimStartPos, cameraAnimTarget.pos, easeT);
+    controls.target.lerpVectors(cameraAnimStartTarget, cameraAnimTarget.target, easeT);
+  }
+
   controls.update();
   handleXRControllerScale();
 
   const elapsedTime = clock.getElapsedTime();
   for (let i = 0; i < faultShaderMaterials.length; i++) {
     faultShaderMaterials[i].uniforms.uTime.value = elapsedTime;
+  }
+  for (let i = 0; i < slabShaderMaterials.length; i++) {
+    slabShaderMaterials[i].uniforms.uTime.value = elapsedTime;
   }
 
   updateShockwaves(dt);
