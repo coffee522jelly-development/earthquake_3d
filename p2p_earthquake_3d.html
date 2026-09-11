@@ -264,12 +264,19 @@ body.light-mode #help{color:#64748b}
   <div id="top-left-weather" style="display:none; position:absolute; left:12px; top:48px; z-index:20; flex-direction:column; align-items:flex-start; gap:6px;">
     <button id="weather-menu-toggle" class="theme-btn active-blue">⚙️ 天気レイヤーメニュー</button>
     <div id="weather-menu-panel" style="display:flex; flex-direction:column; gap:10px; background:#0c131c; border:1px solid #233446; padding:12px; width:360px; max-width:calc(100vw - 24px); max-height:calc(100vh - 68px); overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,0.6); box-sizing:border-box;">
-      <div class="menu-section-title"><span>🌧️ 全国24時間 予想降雨量 & 台風情報</span></div>
+      <div class="menu-section-title"><span id="weather-title-text">🌧️ 全国24時間 予想降雨量 & 台風情報</span></div>
       <div id="weather-summary" style="font-size:11px; line-height:1.5; color:#a0b0bc;">
         <b style="color:#00e5ff">🌀 台風10号 (サンサン) 接近中</b><br>
         中心気圧: <b>950 hPa</b> / 最大風速: <b>45 m/s</b><br>
         移動: 北北西 20 km/h （非常に強い勢力）<br>
-        <span style="color:#f59e0b">⚠️ 東日本〜西日本 太平洋側で24時間雨量200mm超の大雨に警戒</span>
+        <span id="weather-warning-text" style="color:#f59e0b">⚠️ 東日本〜西日本 太平洋側で24時間雨量200mm超の大雨に警戒</span>
+      </div>
+      <div class="menu-section-title">⏱️ 降雨量 集計期間</div>
+      <div class="tabs" style="grid-template-columns: repeat(4, 1fr);" id="weather-timeframe-tabs">
+        <button class="tab weather-time-tab active" data-timeframe="24h">24時間</button>
+        <button class="tab weather-time-tab" data-timeframe="3days">3日間</button>
+        <button class="tab weather-time-tab" data-timeframe="1week">1週間</button>
+        <button class="tab weather-time-tab" data-timeframe="1month">1ヶ月</button>
       </div>
       <div class="menu-section-title">⚙️ 気象表示トグル</div>
       <div class="menu-buttons">
@@ -2171,7 +2178,45 @@ weatherGroup.add(rainGroup);
 const typhoonGroup = new THREE.Group();
 weatherGroup.add(typhoonGroup);
 
-// 全国の主要地域 24時間予想降雨量サンプルデータ (mm)
+// 集計期間ごとの定義設定 (24時間 / 3日間 / 1週間 / 1ヶ月)
+const TIMEFRAME_CONFIGS = {
+  '24h': {
+    title: '24時間 予想降雨量',
+    short: '24H',
+    mult: 1.0,
+    thresholds: [30, 80, 150, 250],
+    heightScale: 0.35,
+    legendTexts: ['10〜30 mm (小〜中雨)', '30〜80 mm (大雨)', '80〜150 mm (激しい雨)', '150mm+ (猛烈な雨)']
+  },
+  '3days': {
+    title: '3日間 累積降雨量',
+    short: '3日',
+    mult: 2.2,
+    thresholds: [60, 150, 300, 500],
+    heightScale: 0.18,
+    legendTexts: ['20〜60 mm (小〜中雨)', '60〜150 mm (大雨)', '150〜300 mm (激しい雨)', '300mm+ (猛烈な雨)']
+  },
+  '1week': {
+    title: '1週間 累積降雨量',
+    short: '1週間',
+    mult: 4.2,
+    thresholds: [120, 250, 500, 800],
+    heightScale: 0.10,
+    legendTexts: ['50〜120 mm (小〜中雨)', '120〜250 mm (大雨)', '250〜500 mm (激しい雨)', '500mm+ (猛烈な雨)']
+  },
+  '1month': {
+    title: '1ヶ月 累積降雨量',
+    short: '1ヶ月',
+    mult: 9.5,
+    thresholds: [250, 500, 900, 1500],
+    heightScale: 0.05,
+    legendTexts: ['100〜250 mm (小〜中雨)', '250〜500 mm (大雨)', '500〜900 mm (激しい雨)', '900mm+ (猛烈な雨)']
+  }
+};
+
+let currentWeatherTimeframe = '24h';
+
+// 全国の主要地域 24時間予想降雨量ベースデータ (mm)
 const REGIONAL_RAINFALL = [
   { name: '東京 (関東)', lon: 139.69, lat: 35.68, mm: 110 },
   { name: '横浜', lon: 139.63, lat: 35.44, mm: 125 },
@@ -2199,12 +2244,14 @@ const REGIONAL_RAINFALL = [
   { name: '那覇 (沖縄)', lon: 127.68, lat: 26.21, mm: 15 }
 ];
 
-function getRainfallColor(mm) {
-  if (mm >= 250) return new THREE.Color(0xef4444); // 250mm+: 赤 (猛烈)
-  if (mm >= 150) return new THREE.Color(0xf97316); // 150-250mm: オレンジ (激しい)
-  if (mm >= 80)  return new THREE.Color(0xeab308); // 80-150mm: 黄 (大雨)
-  if (mm >= 30)  return new THREE.Color(0x00e5ff); // 30-80mm: シアン (中雨)
-  return new THREE.Color(0x3b82f6);               // <30mm: 青 (小雨)
+function getRainfallColor(mm, timeframe = '24h') {
+  const cfg = TIMEFRAME_CONFIGS[timeframe] || TIMEFRAME_CONFIGS['24h'];
+  const t = cfg.thresholds;
+  if (mm >= t[3]) return new THREE.Color(0xef4444); // 猛烈な雨 (赤)
+  if (mm >= t[2]) return new THREE.Color(0xf97316); // 激しい雨 (オレンジ)
+  if (mm >= t[1]) return new THREE.Color(0xeab308); // 大雨 (黄)
+  if (mm >= t[0]) return new THREE.Color(0x00e5ff); // 中雨 (シアン)
+  return new THREE.Color(0x3b82f6);               // 小雨 (青)
 }
 
 function createWeatherLabel(text, colorHex) {
@@ -2231,14 +2278,19 @@ function createWeatherLabel(text, colorHex) {
   return sprite;
 }
 
-function init3DRainfallPillars() {
+function init3DRainfallPillars(timeframe = '24h') {
+  rainGroup.clear();
+  currentWeatherTimeframe = timeframe;
+
+  const cfg = TIMEFRAME_CONFIGS[timeframe] || TIMEFRAME_CONFIGS['24h'];
   const unitCylinderGeo = new THREE.CylinderGeometry(2.5, 2.5, 1, 16);
   unitCylinderGeo.translate(0, 0.5, 0);
 
   REGIONAL_RAINFALL.forEach(r => {
+    const calcMm = Math.round(r.mm * cfg.mult);
     const baseP = geoTo3D(r.lon, r.lat, 0, 0.8);
-    const color = getRainfallColor(r.mm);
-    const height = Math.max(10, r.mm * 0.35); // 降雨量に応じた3Dボリューム柱の高さ
+    const color = getRainfallColor(calcMm, timeframe);
+    const height = Math.max(10, calcMm * cfg.heightScale); // 降雨量に応じた3Dボリューム柱の高さ
 
     const mat = new THREE.MeshStandardMaterial({
       color: color,
@@ -2257,10 +2309,41 @@ function init3DRainfallPillars() {
 
     // 柱の頭頂部に降雨量テキストラベル (例: "高知: 320mm")
     const topPos = baseP.clone().add(new THREE.Vector3(0, height + 4, 0));
-    const label = createWeatherLabel(`${r.name}: ${r.mm}mm`, color);
+    const label = createWeatherLabel(`${r.name}: ${calcMm}mm`, color);
     label.position.copy(topPos);
     rainGroup.add(label);
   });
+
+  // UI表示テキスト更新
+  const weatherTitleText = document.querySelector('#weather-title-text');
+  if (weatherTitleText) weatherTitleText.textContent = `🌧️ 全国${cfg.title} & 台風情報`;
+
+  const weatherWarnText = document.querySelector('#weather-warning-text');
+  if (weatherWarnText) weatherWarnText.textContent = `⚠️ 東日本〜西日本 太平洋側で${cfg.short}雨量${Math.round(200 * cfg.mult)}mm超の大雨に警戒`;
+
+  const rainToggleBtn = document.querySelector('#rain-toggle');
+  if (rainToggleBtn) rainToggleBtn.textContent = `📊 ${cfg.short} 降雨量柱`;
+
+  const weatherViewTab = document.querySelector('.view-tab[data-view-mode="weather"]');
+  if (weatherViewTab) weatherViewTab.textContent = `🌧️ 天気 3D ビュー (${cfg.short} 降雨量)`;
+
+  const legendBox = document.querySelector('#weather-legend');
+  if (legendBox) {
+    legendBox.innerHTML = `
+      <div style="font-weight:700; color:#00e5ff; margin-bottom:4px;">🌧️ ${cfg.title} (mm)</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px; font-size:10px;">
+        <div><span style="color:#3b82f6">■</span> ${cfg.legendTexts[0]}</div>
+        <div><span style="color:#eab308">■</span> ${cfg.legendTexts[1]}</div>
+        <div><span style="color:#f97316">■</span> ${cfg.legendTexts[2]}</div>
+        <div><span style="color:#ef4444">■</span> ${cfg.legendTexts[3]}</div>
+      </div>
+      <div style="font-weight:700; color:#f59e0b; margin-top:8px; margin-bottom:4px;">🌀 台風 & 予報円</div>
+      <div style="font-size:10px; line-height:1.4;">
+        <span style="color:#f59e0b">━</span> 過去＆今後の予測進路軸<br>
+        <span style="color:#f59e0b">◯</span> 24h / 48h / 72h 予報円 (70%進入確率)
+      </div>
+    `;
+  }
 }
 
 // 台風10号サンプルデータ (現在位置 & 24H/48H/72H 予報)
@@ -2373,8 +2456,18 @@ function init3DTyphoon() {
   });
 }
 
-init3DRainfallPillars();
+init3DRainfallPillars('24h');
 init3DTyphoon();
+
+// 天気集計期間 (24時間 / 3日間 / 1週間 / 1ヶ月) タブ切替操作
+const weatherTimeTabs = document.querySelectorAll('.weather-time-tab');
+weatherTimeTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const timeframe = tab.dataset.timeframe;
+    weatherTimeTabs.forEach(t => t.classList.toggle('active', t.dataset.timeframe === timeframe));
+    init3DRainfallPillars(timeframe);
+  });
+});
 
 // 天気トグル操作
 const rainToggleBtn = document.querySelector('#rain-toggle');
