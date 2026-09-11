@@ -249,13 +249,46 @@ body.light-mode #help{color:#64748b}
   <!-- ビュー切り替え案内モーダル (天気3Dビュー等の拡張案内) -->
   <div id="view-modal" class="hidden">
     <div class="view-modal-content">
-      <div class="view-modal-title">🌧️ 天気 3D ビュー (24H 予想降雨量)</div>
+      <div class="view-modal-title">🌧️ 天気 3D ビュー (24H 予想降雨量 & 台風進路)</div>
       <div class="view-modal-body">
-        CAD空間エンジンに天気ビューモジュールが連携されました。<br>
-        24時間の予想降雨量3Dメッシュ・雨雲アグリゲーションおよび気圧配置図の立体オーバーレイ描画が準備状態です。
+        CAD空間エンジンに天気・気象ビューが起動しました。<br>
+        全国主要地域の24時間予想降雨量3Dボリューム柱、気圧配置および大型台風（台風10号）の現在地・3D渦状雲群・進路・24H/48H/72H 予報円が表示されています。
       </div>
       <div class="view-modal-footer">
-        <button id="view-modal-close" class="view-modal-btn">了解 / 地震ビューに戻る</button>
+        <button id="view-modal-close" class="view-modal-btn">3D気象マップを閲覧する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 天気ビュー専用の統合メニュー -->
+  <div id="top-left-weather" style="display:none; position:absolute; left:12px; top:48px; z-index:20; flex-direction:column; align-items:flex-start; gap:6px;">
+    <button id="weather-menu-toggle" class="theme-btn active-blue">⚙️ 天気レイヤーメニュー</button>
+    <div id="weather-menu-panel" style="display:flex; flex-direction:column; gap:10px; background:#0c131c; border:1px solid #233446; padding:12px; width:360px; max-width:calc(100vw - 24px); max-height:calc(100vh - 68px); overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,0.6); box-sizing:border-box;">
+      <div class="menu-section-title"><span>🌧️ 全国24時間 予想降雨量 & 台風情報</span></div>
+      <div id="weather-summary" style="font-size:11px; line-height:1.5; color:#a0b0bc;">
+        <b style="color:#00e5ff">🌀 台風10号 (サンサン) 接近中</b><br>
+        中心気圧: <b>950 hPa</b> / 最大風速: <b>45 m/s</b><br>
+        移動: 北北西 20 km/h （非常に強い勢力）<br>
+        <span style="color:#f59e0b">⚠️ 東日本〜西日本 太平洋側で24時間雨量200mm超の大雨に警戒</span>
+      </div>
+      <div class="menu-section-title">⚙️ 気象表示トグル</div>
+      <div class="menu-buttons">
+        <button id="rain-toggle" class="theme-btn active-blue">📊 24H 降雨量柱</button>
+        <button id="typhoon-toggle" class="theme-btn active-orange">🌀 台風・予報円</button>
+      </div>
+      <div id="weather-legend" style="background:#090e15; border:1px solid #1c2b3a; padding:8px 10px; font-size:11px; line-height:1.45; margin-top:4px;">
+        <div style="font-weight:700; color:#00e5ff; margin-bottom:4px;">🌧️ 24時間予想降雨量 (mm)</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px; font-size:10px;">
+          <div><span style="color:#3b82f6">■</span> 10〜30 mm (小〜中雨)</div>
+          <div><span style="color:#eab308">■</span> 30〜80 mm (大雨)</div>
+          <div><span style="color:#f97316">■</span> 80〜150 mm (激しい雨)</div>
+          <div><span style="color:#ef4444">■</span> 150mm+ (猛烈な雨)</div>
+        </div>
+        <div style="font-weight:700; color:#f59e0b; margin-top:8px; margin-bottom:4px;">🌀 台風 & 予報円</div>
+        <div style="font-size:10px; line-height:1.4;">
+          <span style="color:#f59e0b">━</span> 過去＆今後の予測進路軸<br>
+          <span style="color:#f59e0b">◯</span> 24h / 48h / 72h 予報円 (70%進入確率)
+        </div>
       </div>
     </div>
   </div>
@@ -2125,7 +2158,253 @@ if (topThemeBtn) {
   topThemeBtn.addEventListener('click', toggleTheme);
 }
 
-// CAD View Switcher (地震 3D ビュー ⇄ 天気 3D ビュー 24H 予想降雨量)
+// ----------------------------------------------------
+// 天気・24時間予想降雨量 & 台風・予報円 3D表示機能
+// ----------------------------------------------------
+const weatherGroup = new THREE.Group();
+weatherGroup.visible = false;
+worldGroup.add(weatherGroup);
+
+const rainGroup = new THREE.Group();
+weatherGroup.add(rainGroup);
+
+const typhoonGroup = new THREE.Group();
+weatherGroup.add(typhoonGroup);
+
+// 全国の主要地域 24時間予想降雨量サンプルデータ (mm)
+const REGIONAL_RAINFALL = [
+  { name: '東京 (関東)', lon: 139.69, lat: 35.68, mm: 110 },
+  { name: '横浜', lon: 139.63, lat: 35.44, mm: 125 },
+  { name: '千葉', lon: 140.12, lat: 35.60, mm: 95 },
+  { name: '宇都宮', lon: 139.88, lat: 36.56, mm: 70 },
+  { name: '静岡 (東海)', lon: 138.38, lat: 34.97, mm: 240 },
+  { name: '名古屋', lon: 136.90, lat: 35.18, mm: 180 },
+  { name: '津 (三重)', lon: 136.50, lat: 34.73, mm: 210 },
+  { name: '大阪 (近畿)', lon: 135.50, lat: 34.69, mm: 145 },
+  { name: '京都', lon: 135.76, lat: 35.01, mm: 120 },
+  { name: '神戸', lon: 135.19, lat: 34.69, mm: 160 },
+  { name: '和歌山・潮岬', lon: 135.76, lat: 33.43, mm: 280 },
+  { name: '高知 (四国)', lon: 133.53, lat: 33.56, mm: 320 },
+  { name: '徳島', lon: 134.55, lat: 34.07, mm: 190 },
+  { name: '松山', lon: 132.76, lat: 33.84, mm: 105 },
+  { name: '広島 (中国)', lon: 132.45, lat: 34.39, mm: 85 },
+  { name: '岡山', lon: 133.93, lat: 34.66, mm: 75 },
+  { name: '松江', lon: 133.05, lat: 35.47, mm: 45 },
+  { name: '福岡 (九州)', lon: 130.40, lat: 33.59, mm: 130 },
+  { name: '鹿児島', lon: 130.55, lat: 31.59, mm: 260 },
+  { name: '宮崎', lon: 131.42, lat: 31.91, mm: 310 },
+  { name: '仙台 (東北)', lon: 140.87, lat: 38.26, mm: 50 },
+  { name: '盛岡', lon: 141.15, lat: 39.70, mm: 35 },
+  { name: '札幌 (北海道)', lon: 141.35, lat: 43.06, mm: 20 },
+  { name: '那覇 (沖縄)', lon: 127.68, lat: 26.21, mm: 15 }
+];
+
+function getRainfallColor(mm) {
+  if (mm >= 250) return new THREE.Color(0xef4444); // 250mm+: 赤 (猛烈)
+  if (mm >= 150) return new THREE.Color(0xf97316); // 150-250mm: オレンジ (激しい)
+  if (mm >= 80)  return new THREE.Color(0xeab308); // 80-150mm: 黄 (大雨)
+  if (mm >= 30)  return new THREE.Color(0x00e5ff); // 30-80mm: シアン (中雨)
+  return new THREE.Color(0x3b82f6);               // <30mm: 青 (小雨)
+}
+
+function createWeatherLabel(text, colorHex) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 280;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.font = 'Bold 22px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const colorStr = '#' + new THREE.Color(colorHex).getHexString();
+  ctx.strokeStyle = 'rgba(5, 12, 18, 0.9)';
+  ctx.lineWidth = 5;
+  ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+  ctx.fillStyle = colorStr;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(28, 6.4, 1);
+  return sprite;
+}
+
+function init3DRainfallPillars() {
+  const unitCylinderGeo = new THREE.CylinderGeometry(2.5, 2.5, 1, 16);
+  unitCylinderGeo.translate(0, 0.5, 0);
+
+  REGIONAL_RAINFALL.forEach(r => {
+    const baseP = geoTo3D(r.lon, r.lat, 0, 0.8);
+    const color = getRainfallColor(r.mm);
+    const height = Math.max(10, r.mm * 0.35); // 降雨量に応じた3Dボリューム柱の高さ
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.2,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.75,
+      emissive: color,
+      emissiveIntensity: 0.3
+    });
+
+    const mesh = new THREE.Mesh(unitCylinderGeo, mat);
+    mesh.position.copy(baseP);
+    mesh.scale.set(1.0, height, 1.0);
+    rainGroup.add(mesh);
+
+    // 柱の頭頂部に降雨量テキストラベル (例: "高知: 320mm")
+    const topPos = baseP.clone().add(new THREE.Vector3(0, height + 4, 0));
+    const label = createWeatherLabel(`${r.name}: ${r.mm}mm`, color);
+    label.position.copy(topPos);
+    rainGroup.add(label);
+  });
+}
+
+// 台風10号サンプルデータ (現在位置 & 24H/48H/72H 予報)
+const TYPHOON_DATA = {
+  name: '台風10号 (サンサン)',
+  current: { lon: 133.8, lat: 31.2, pressure: 950, maxWind: 45, radiusKm: 30 },
+  track: [
+    { hour: 0,  lon: 133.8, lat: 31.2, pressure: 950, maxWind: 45, probRadiusKm: 0,   label: '現在地 (950hPa / 45m/s)' },
+    { hour: 24, lon: 135.2, lat: 33.4, pressure: 960, maxWind: 40, probRadiusKm: 65,  label: '24H後 予報円 (960hPa)' },
+    { hour: 48, lon: 137.5, lat: 35.2, pressure: 975, maxWind: 33, probRadiusKm: 120, label: '48H後 予報円 (975hPa)' },
+    { hour: 72, lon: 140.2, lat: 37.0, pressure: 985, maxWind: 28, probRadiusKm: 180, label: '72H後 予報円 (985hPa)' }
+  ]
+};
+
+let typhoonSpiralMesh = null;
+
+function init3DTyphoon() {
+  const cur = TYPHOON_DATA.current;
+  const curPos = geoToSeaLevel3D(cur.lon, cur.lat, 12.0);
+
+  // 1. 台風の回転 3D 渦状雲群 (Spiral Cloud Ring Mesh)
+  const ringGeo = new THREE.RingGeometry(8, 48, 48, 8);
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.65,
+    roughness: 0.3,
+    emissive: 0x0284c7,
+    emissiveIntensity: 0.4
+  });
+  typhoonSpiralMesh = new THREE.Mesh(ringGeo, ringMat);
+  typhoonSpiralMesh.position.copy(curPos);
+  typhoonSpiralMesh.rotation.x = -Math.PI / 2;
+  typhoonGroup.add(typhoonSpiralMesh);
+
+  // 台風の目 (Eye Sphere)
+  const eyeGeo = new THREE.SphereGeometry(3.5, 16, 16);
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 });
+  const eyeMesh = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeMesh.position.copy(curPos);
+  typhoonGroup.add(eyeMesh);
+
+  // 現在地 3D ラベル
+  const eyeLabel = createWeatherLabel(`🌀 ${TYPHOON_DATA.name} (${cur.pressure}hPa)`, 0x00e5ff);
+  eyeLabel.position.copy(curPos).add(new THREE.Vector3(0, 18, 0));
+  typhoonGroup.add(eyeLabel);
+
+  // 2. 予測進路軸 (Track Line)
+  const trackPts = TYPHOON_DATA.track.map(t => geoToSeaLevel3D(t.lon, t.lat, 2.0));
+  const trackGeo = new THREE.BufferGeometry().setFromPoints(trackPts);
+  const trackMat = new THREE.LineDashedMaterial({
+    color: 0xf59e0b,
+    dashSize: 3,
+    gapSize: 2,
+    linewidth: 3,
+    transparent: true,
+    opacity: 0.95
+  });
+  const trackLine = new THREE.Line(trackGeo, trackMat);
+  trackLine.computeLineDistances();
+  typhoonGroup.add(trackLine);
+
+  // 3. 予報円 (Forecast Probability Circles: 24H, 48H, 72H)
+  TYPHOON_DATA.track.forEach((t, idx) => {
+    const centerPos = geoToSeaLevel3D(t.lon, t.lat, 1.5);
+
+    if (t.probRadiusKm > 0) {
+      // 70% 進入確率の予報円
+      const circlePts = [];
+      const steps = 64;
+      const theta = t.probRadiusKm / 6371.0;
+      const phi0 = t.lat * RAD;
+      const lam0 = t.lon * RAD;
+
+      for (let i = 0; i <= steps; i++) {
+        const alpha = (i / steps) * Math.PI * 2.0;
+        const sinPhi = Math.sin(phi0) * Math.cos(theta) + Math.cos(phi0) * Math.sin(theta) * Math.cos(alpha);
+        const phi = Math.asin(Math.max(-1.0, Math.min(1.0, sinPhi)));
+        const y = Math.sin(alpha) * Math.sin(theta) * Math.cos(phi0);
+        const x = Math.cos(theta) - Math.sin(phi0) * sinPhi;
+        const lam = lam0 + Math.atan2(y, x);
+
+        circlePts.push(geoToSeaLevel3D(lam / RAD, phi / RAD, 1.5));
+      }
+
+      const circleGeo = new THREE.BufferGeometry().setFromPoints(circlePts);
+      const circleMat = new THREE.LineDashedMaterial({
+        color: 0xf59e0b,
+        dashSize: 2,
+        gapSize: 1,
+        transparent: true,
+        opacity: 0.85
+      });
+      const circleLine = new THREE.Line(circleGeo, circleMat);
+      circleLine.computeLineDistances();
+      typhoonGroup.add(circleLine);
+
+      // 予報円の中心スフィア点 & ラベル
+      const centerDotGeo = new THREE.SphereGeometry(2.0, 12, 12);
+      const centerDotMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const centerDot = new THREE.Mesh(centerDotGeo, centerDotMat);
+      centerDot.position.copy(centerPos);
+      typhoonGroup.add(centerDot);
+
+      const forecastLabel = createWeatherLabel(`🎯 ${t.label}`, 0xf59e0b);
+      forecastLabel.position.copy(centerPos).add(new THREE.Vector3(0, 12, 0));
+      typhoonGroup.add(forecastLabel);
+    }
+  });
+}
+
+init3DRainfallPillars();
+init3DTyphoon();
+
+// 天気トグル操作
+const rainToggleBtn = document.querySelector('#rain-toggle');
+if (rainToggleBtn) {
+  rainToggleBtn.addEventListener('click', () => {
+    rainGroup.visible = !rainGroup.visible;
+    rainToggleBtn.classList.toggle('active-blue', rainGroup.visible);
+  });
+}
+
+const typhoonToggleBtn = document.querySelector('#typhoon-toggle');
+if (typhoonToggleBtn) {
+  typhoonToggleBtn.addEventListener('click', () => {
+    typhoonGroup.visible = !typhoonGroup.visible;
+    typhoonToggleBtn.classList.toggle('active-orange', typhoonGroup.visible);
+  });
+}
+
+const weatherMenuToggle = document.querySelector('#weather-menu-toggle');
+const weatherMenuPanel = document.querySelector('#weather-menu-panel');
+const topLeftWeather = document.querySelector('#top-left-weather');
+
+if (weatherMenuToggle && weatherMenuPanel) {
+  weatherMenuToggle.addEventListener('click', () => {
+    const isHidden = weatherMenuPanel.style.display === 'none';
+    weatherMenuPanel.style.display = isHidden ? 'flex' : 'none';
+  });
+}
+
+// CAD View Switcher (地震 3D ビュー ⇄ 天気 3D ビュー 24H 予想降雨量 & 台風)
 const viewTabs = document.querySelectorAll('.view-tab');
 const viewModal = document.querySelector('#view-modal');
 const viewModalClose = document.querySelector('#view-modal-close');
@@ -2138,12 +2417,16 @@ function switchViewMode(mode) {
     if (viewModal) viewModal.classList.remove('hidden');
     quakeGroup.visible = false;
     intensityGroup.visible = false;
+    weatherGroup.visible = true;
     if (topLeftMenu) topLeftMenu.style.display = 'none';
+    if (topLeftWeather) topLeftWeather.style.display = 'flex';
   } else if (mode === 'earthquake') {
     if (viewModal) viewModal.classList.add('hidden');
     quakeGroup.visible = true;
     intensityGroup.visible = true;
+    weatherGroup.visible = false;
     if (topLeftMenu) topLeftMenu.style.display = '';
+    if (topLeftWeather) topLeftWeather.style.display = 'none';
   }
 }
 
@@ -2156,7 +2439,7 @@ viewTabs.forEach(tab => {
 
 if (viewModalClose) {
   viewModalClose.addEventListener('click', () => {
-    switchViewMode('earthquake');
+    if (viewModal) viewModal.classList.add('hidden');
   });
 }
 
@@ -2695,6 +2978,10 @@ function animate(){
   }
 
   updateShockwaves(dt);
+
+  if (typhoonSpiralMesh && weatherGroup.visible) {
+    typhoonSpiralMesh.rotation.z += dt * 0.4;
+  }
 
   renderer.render(scene,camera);
 }
